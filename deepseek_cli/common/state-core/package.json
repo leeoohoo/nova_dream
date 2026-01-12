@@ -1,0 +1,7 @@
+{
+  "name": "@leeoohoo/state-core",
+  "version": "0.1.1",
+  "description": "Shared state/session path utilities for ChatOS/AIDE multi-app data isolation.",
+  "type": "module"
+}
+

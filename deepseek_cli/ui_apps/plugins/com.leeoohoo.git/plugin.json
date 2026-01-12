@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "id": "com.leeoohoo.git",
+  "providerAppId": "git_app",
+  "name": "Git Manager",
+  "version": "0.1.0",
+  "description": "在 ChatOS 内管理 Git 仓库，支持 GitHub/Gitee 两种平台和多种认证方式。",
+  "backend": { "entry": "backend/index.mjs" },
+  "apps": [
+    {
+      "id": "manager",
+      "name": "Git Manager",
+      "description": "可视化管理 Git 仓库，支持提交、推送、拉取、分支操作等核心功能。",
+      "entry": { "type": "module", "path": "git-manager/index.mjs" },
+      "ai": {
+        "mcp": {
+          "entry": "git-manager/mcp-server.mjs",
+          "command": "node",
+          "allowMain": true,
+          "allowSub": true,
+          "enabled": true,
+          "description": "Git MCP server (manage git repositories)"
+        },
+        "mcpPrompt": {
+          "title": "Git Manager · MCP Prompt",
+          "zh": "git-manager/mcp-prompt.zh.md",
+          "en": "git-manager/mcp-prompt.en.md"
+        }
+      }
+    }
+  ]
+}

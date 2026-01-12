@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "id": "com.leeoohoo.wsl",
+  "providerAppId": "wsl",
+  "name": "WSL Tools",
+  "version": "0.1.0",
+  "description": "在 ChatOS 内管理/执行 Windows Subsystem for Linux (WSL) 命令。",
+  "backend": { "entry": "backend/index.mjs" },
+  "apps": [
+    {
+      "id": "manager",
+      "name": "WSL Manager",
+      "description": "列出发行版并执行 WSL 命令（支持实时输出）。",
+      "entry": { "type": "module", "path": "wsl-manager/index.mjs" },
+      "ai": {
+        "mcp": {
+          "entry": "wsl-manager/mcp-server.mjs",
+          "command": "node",
+          "allowMain": true,
+          "allowSub": true,
+          "enabled": true,
+          "description": "WSL MCP server (run commands inside WSL)"
+        },
+        "mcpPrompt": {
+          "title": "WSL Tools · MCP Prompt",
+          "zh": "wsl-manager/mcp-prompt.zh.md",
+          "en": "wsl-manager/mcp-prompt.en.md"
+        }
+      }
+    }
+  ]
+}

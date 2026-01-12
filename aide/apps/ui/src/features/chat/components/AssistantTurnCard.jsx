@@ -1,0 +1,212 @@
+import React, { useMemo } from 'react';
+import { Card, Space, Tag, Typography } from 'antd';
+
+import { MarkdownBlock } from '../../../components/MarkdownBlock.jsx';
+import { PopoverTag } from './PopoverTag.jsx';
+
+const { Text } = Typography;
+
+function normalizeId(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatTime(ts) {
+  const ms = Date.parse(ts);
+  if (!Number.isFinite(ms)) return '';
+  return new Date(ms).toLocaleTimeString();
+}
+
+function getToolName(call) {
+  const name = call?.function?.name;
+  return typeof name === 'string' ? name.trim() : '';
+}
+
+function getToolArgs(call) {
+  const args = call?.function?.arguments;
+  if (typeof args === 'string') return args;
+  if (args === undefined || args === null) return '';
+  return String(args);
+}
+
+function getToolResultText(results = []) {
+  const parts = (Array.isArray(results) ? results : [])
+    .map((msg) => {
+      if (!msg) return '';
+      if (typeof msg?.content === 'string') return msg.content;
+      return String(msg?.content || '');
+    })
+    .map((text) => (typeof text === 'string' ? text.trim() : String(text || '').trim()))
+    .filter(Boolean);
+  return parts.join('\n\n');
+}
+
+export function AssistantTurnCard({ messages, streaming }) {
+  const list = useMemo(() => (Array.isArray(messages) ? messages.filter(Boolean) : []), [messages]);
+  const createdAt = useMemo(() => {
+    const first = list.find((m) => m?.createdAt);
+    return first?.createdAt || '';
+  }, [list]);
+  const timeText = useMemo(() => (createdAt ? formatTime(createdAt) : ''), [createdAt]);
+
+  const blocks = useMemo(() => {
+    const out = [];
+    const toolResultsByCallId = new Map();
+    list.forEach((msg) => {
+      if (msg?.role !== 'tool') return;
+      const callId = normalizeId(msg?.toolCallId);
+      if (!callId) return;
+      const existing = toolResultsByCallId.get(callId);
+      if (existing) {
+        existing.push(msg);
+      } else {
+        toolResultsByCallId.set(callId, [msg]);
+      }
+    });
+    const consumedToolMessageIds = new Set();
+
+    list.forEach((msg, msgIdx) => {
+      if (!msg) return;
+      if (msg.role === 'assistant') {
+        const content = typeof msg?.content === 'string' ? msg.content : String(msg?.content || '');
+        if (content.trim()) {
+          out.push({
+            type: 'assistant',
+            key: normalizeId(msg?.id) || `assistant_${msgIdx}`,
+            content,
+          });
+        }
+        const calls = Array.isArray(msg?.toolCalls) ? msg.toolCalls.filter(Boolean) : [];
+        if (calls.length > 0) {
+          const invocations = calls.map((call, idx) => {
+            const callId = normalizeId(call?.id);
+            const results = callId ? toolResultsByCallId.get(callId) || [] : [];
+            results.forEach((res) => {
+              const mid = normalizeId(res?.id);
+              if (mid) consumedToolMessageIds.add(mid);
+            });
+            const nameFromCall = getToolName(call);
+            const nameFromResult =
+              results.length > 0 && typeof results?.[0]?.toolName === 'string'
+                ? results[0].toolName.trim()
+                : '';
+            const name = nameFromCall || nameFromResult || 'tool';
+            return {
+              callId,
+              name,
+              args: getToolArgs(call),
+              resultText: getToolResultText(results),
+              key: callId || `${normalizeId(msg?.id) || `assistant_${msgIdx}`}_${name}_${idx}`,
+            };
+          });
+          out.push({
+            type: 'tool_invocations',
+            key: `${normalizeId(msg?.id) || `assistant_${msgIdx}`}_tool_invocations`,
+            invocations,
+            assistantId: normalizeId(msg?.id),
+          });
+        }
+        return;
+      }
+      if (msg.role === 'tool') {
+        const mid = normalizeId(msg?.id);
+        if (mid && consumedToolMessageIds.has(mid)) {
+          return;
+        }
+        const last = out[out.length - 1];
+        if (last && last.type === 'tool_orphans') {
+          last.results.push(msg);
+          return;
+        }
+        out.push({ type: 'tool_orphans', key: normalizeId(msg?.id) || `tool_${msgIdx}`, results: [msg] });
+      }
+    });
+    return out;
+  }, [list]);
+
+  const hasBlocks = blocks.length > 0;
+  const isStreaming = Boolean(
+    streaming?.messageId && list.some((m) => normalizeId(m?.id) === normalizeId(streaming.messageId))
+  );
+
+  return (
+    <Card
+      size="small"
+      styles={{ body: { padding: 12 } }}
+      style={{ borderRadius: 10 }}
+      title={
+        <Space size={8}>
+          <Tag color="green">AI</Tag>
+          {timeText ? <Text type="secondary">{timeText}</Text> : null}
+          {isStreaming ? <Text type="secondary">（输出中…）</Text> : null}
+        </Space>
+      }
+    >
+      {hasBlocks ? (
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          {blocks.map((block) => {
+            if (block.type === 'assistant') {
+              return <MarkdownBlock key={block.key} text={block.content} alwaysExpanded />;
+            }
+            if (block.type === 'tool_invocations') {
+              return (
+                <Space key={block.key} size={[4, 4]} wrap>
+                  {(Array.isArray(block.invocations) ? block.invocations : []).map((invocation, idx) => {
+                    const name = invocation?.name || 'tool';
+                    const callId = normalizeId(invocation?.callId);
+                    const args = typeof invocation?.args === 'string' ? invocation.args : String(invocation?.args || '');
+                    const resultText =
+                      typeof invocation?.resultText === 'string'
+                        ? invocation.resultText
+                        : String(invocation?.resultText || '');
+                    const key = invocation?.key || callId || `${block.assistantId || block.key}_${name}_${idx}`;
+                    const title = `${name}${callId ? ` · ${callId}` : ''}`;
+                    return (
+                      <PopoverTag key={key} color={resultText ? 'purple' : 'gold'} text={name} title={title}>
+                        <div>
+                          {args ? (
+                            <>
+                              <Text type="secondary">参数</Text>
+                              <pre style={{ margin: '6px 0 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                {args}
+                              </pre>
+                            </>
+                          ) : null}
+                          <Text type="secondary">结果</Text>
+                          {resultText ? <MarkdownBlock text={resultText} maxHeight={320} /> : <Text type="secondary">（暂无结果）</Text>}
+                        </div>
+                      </PopoverTag>
+                    );
+                  })}
+                </Space>
+              );
+            }
+            if (block.type === 'tool_orphans') {
+              return (
+                <Space key={block.key} size={[4, 4]} wrap>
+                  {(Array.isArray(block.results) ? block.results : []).map((result, idx) => {
+                    const name = typeof result?.toolName === 'string' ? result.toolName.trim() : '';
+                    const callId = normalizeId(result?.toolCallId);
+                    const content = typeof result?.content === 'string' ? result.content : String(result?.content || '');
+                    const key = normalizeId(result?.id) || `${name || 'tool'}_${callId || ''}_${idx}`;
+                    const title = `${name || 'tool'}${callId ? ` · ${callId}` : ''}`;
+                    return (
+                      <PopoverTag key={key} color="purple" text={name || 'tool'} title={title}>
+                        <div>
+                          <Text type="secondary">结果</Text>
+                          {content ? <MarkdownBlock text={content} maxHeight={320} alwaysExpanded /> : <Text type="secondary">（空）</Text>}
+                        </div>
+                      </PopoverTag>
+                    );
+                  })}
+                </Space>
+              );
+            }
+            return null;
+          })}
+        </Space>
+      ) : (
+        <Text type="secondary">（无内容）</Text>
+      )}
+    </Card>
+  );
+}

@@ -1,0 +1,181 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import hljs from 'highlight.js';
+import { Button, Space, Typography } from 'antd';
+
+const { Text } = Typography;
+
+const MAX_HIGHLIGHT_CHARS = 200_000;
+const MAX_AUTO_DETECT_CHARS = 20_000;
+
+function normalizeHighlightLanguage(language) {
+  if (!language) return null;
+  const value = String(language).trim().toLowerCase();
+  if (!value) return null;
+  if (value === 'text') return 'plaintext';
+  if (value === 'shell') return 'bash';
+  if (value === 'yml') return 'yaml';
+  if (value === 'md') return 'markdown';
+  return value;
+}
+
+function highlightToHtml(code, language) {
+  const raw = String(code ?? '');
+  const normalized = normalizeHighlightLanguage(language);
+  try {
+    if (normalized && hljs.getLanguage(normalized)) {
+      return hljs.highlight(raw, { language: normalized, ignoreIllegals: true }).value;
+    }
+    if (raw.length <= MAX_AUTO_DETECT_CHARS) {
+      return hljs.highlightAuto(raw).value;
+    }
+  } catch {
+    // ignore highlight errors
+  }
+  return null;
+}
+
+export function CodeBlock({
+  text,
+  maxHeight = 200,
+  alwaysExpanded = false,
+  highlight = false,
+  language,
+  wrap = true,
+  showLineNumbers = false,
+  disableScroll = false,
+  constrainHeight = false,
+}) {
+  const [expanded, setExpanded] = useState(alwaysExpanded);
+  const [forceHighlight, setForceHighlight] = useState(false);
+  useEffect(() => {
+    setExpanded(alwaysExpanded);
+  }, [alwaysExpanded]);
+  useEffect(() => {
+    if (!highlight) setForceHighlight(false);
+  }, [highlight]);
+  if (text === null || text === undefined) return <Text type="secondary">无更多详情</Text>;
+  const content = typeof text === 'string' ? text : String(text);
+  const lineCount = content.split('\n').length;
+  const tooLong = content.length > 320 || lineCount > 8;
+  const limited = !(alwaysExpanded || expanded);
+  const highlightTooLarge = highlight && content.length > MAX_HIGHLIGHT_CHARS;
+  const highlightEnabled = highlight && (!highlightTooLarge || forceHighlight);
+  const highlightedHtml = useMemo(
+    () => (highlightEnabled ? highlightToHtml(content, language) : null),
+    [highlightEnabled, content, language]
+  );
+  const useHighlight = Boolean(highlightEnabled && highlightedHtml);
+  const showFooterActions = (highlightTooLarge && highlight && !forceHighlight) || (tooLong && !alwaysExpanded);
+
+  const effectiveWrap = showLineNumbers ? false : wrap;
+  const heightConstrained = limited || constrainHeight;
+  const overflowY = heightConstrained ? (disableScroll ? 'hidden' : 'auto') : 'visible';
+  const preStyle = {
+    margin: 0,
+    background: 'var(--ds-code-bg)',
+    border: '1px solid var(--ds-code-border)',
+    borderRadius: 6,
+    padding: '10px 12px',
+    fontFamily: 'SFMono-Regular, Consolas, Menlo, monospace',
+    fontSize: 12,
+    lineHeight: '18px',
+    color: 'var(--ds-code-text)',
+    whiteSpace: effectiveWrap ? 'pre-wrap' : 'pre',
+    wordBreak: effectiveWrap ? 'break-word' : 'normal',
+    maxHeight: heightConstrained ? maxHeight : undefined,
+    overflowY,
+    overflowX: heightConstrained ? (effectiveWrap ? 'hidden' : 'auto') : 'visible',
+  };
+
+  const lineNumberText = useMemo(() => {
+    if (!showLineNumbers) return '';
+    const count = Math.max(1, lineCount);
+    const width = String(count).length;
+    return Array.from({ length: count }, (_, idx) => String(idx + 1).padStart(width, ' ')).join('\n');
+  }, [showLineNumbers, lineCount]);
+
+  return (
+    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+      {showLineNumbers ? (
+        <div
+          style={{
+            margin: 0,
+            background: 'var(--ds-code-bg)',
+            border: '1px solid var(--ds-code-border)',
+            borderRadius: 6,
+            fontFamily: 'SFMono-Regular, Consolas, Menlo, monospace',
+            fontSize: 12,
+            lineHeight: '18px',
+            maxHeight: heightConstrained ? maxHeight : undefined,
+            overflowY,
+            overflowX: 'hidden',
+            alignItems: 'flex-start',
+            display: 'flex',
+          }}
+        >
+          <div
+            style={{
+              padding: '10px 10px 10px 12px',
+              color: 'var(--ds-code-line-number)',
+              userSelect: 'none',
+              borderRight: '1px solid var(--ds-code-border)',
+              background: 'var(--ds-code-bg)',
+              whiteSpace: 'pre',
+              textAlign: 'right',
+            }}
+          >
+            <pre style={{ margin: 0 }}>{lineNumberText}</pre>
+          </div>
+          <div style={{ flex: '1 1 auto', minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+            {useHighlight ? (
+              <pre
+                className="hljs"
+                style={{
+                  margin: 0,
+                  padding: '10px 12px',
+                  whiteSpace: 'pre',
+                  wordBreak: 'normal',
+                  display: 'inline-block',
+                  minWidth: '100%',
+                }}
+                dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+              />
+            ) : (
+              <pre
+                style={{
+                  margin: 0,
+                  padding: '10px 12px',
+                  whiteSpace: 'pre',
+                  wordBreak: 'normal',
+                  display: 'inline-block',
+                  minWidth: '100%',
+                  color: 'var(--ds-code-text)',
+                }}
+              >
+                {content}
+              </pre>
+            )}
+          </div>
+        </div>
+      ) : useHighlight ? (
+        <pre className="hljs" style={preStyle} dangerouslySetInnerHTML={{ __html: highlightedHtml }} />
+      ) : (
+        <pre style={preStyle}>{content}</pre>
+      )}
+      {showFooterActions ? (
+        <Space size={8} wrap>
+          {highlightTooLarge && highlight && !forceHighlight ? (
+            <Button type="link" size="small" onClick={() => setForceHighlight(true)}>
+              内容较大，启用高亮
+            </Button>
+          ) : null}
+          {tooLong && !alwaysExpanded ? (
+            <Button type="link" size="small" onClick={() => setExpanded(!expanded)}>
+              {expanded ? '收起' : '展开全部'}
+            </Button>
+          ) : null}
+        </Space>
+      ) : null}
+    </Space>
+  );
+}
