@@ -28,6 +28,24 @@ export default function App({ themeMode = 'light', onToggleTheme }) {
   const developerMode = Boolean(uiFlags?.developerMode);
   const actions = useMemo(() => createAdminActions({ api, hasApi }), []);
 
+  const refreshAdminState = async () => {
+    if (!hasApi) return;
+    try {
+      const payload = await api.invoke('admin:state');
+      const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};
+      setAdmin({ ...EMPTY_ADMIN, ...data });
+      setUiFlags(payload?.uiFlags && typeof payload.uiFlags === 'object' ? payload.uiFlags : {});
+      setError(null);
+    } catch {
+    }
+  };
+
+  const handleSetSubagentModel = async (payload) => {
+    const result = await actions?.setSubagentModel?.(payload);
+    await refreshAdminState();
+    return result;
+  };
+
   useEffect(() => {
     if (!hasApi) return undefined;
     let canceled = false;
@@ -105,7 +123,7 @@ export default function App({ themeMode = 'light', onToggleTheme }) {
                 secretsActions={actions?.secretsActions}
                 mcpActions={actions?.mcpActions}
                 subagentActions={actions?.subagentActions}
-                onSetSubagentModel={actions?.setSubagentModel}
+                onSetSubagentModel={handleSetSubagentModel}
                 promptActions={actions?.promptActions}
                 onSaveSettings={actions?.saveSettings}
                 developerMode={developerMode}
