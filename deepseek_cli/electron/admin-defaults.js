@@ -45,7 +45,9 @@ export function createAdminDefaultsManager({ defaultPaths, adminDb, adminService
     if (!targetModel) {
       throw new Error('model is required');
     }
-    const pluginRoots = [defaultPaths.pluginsDir, defaultPaths.pluginsDirUser].filter(Boolean);
+    const builtinPluginsRoot = defaultPaths.pluginsDir;
+    const userPluginsRoot = defaultPaths.pluginsDirUser;
+    const pluginRoots = [userPluginsRoot, builtinPluginsRoot].filter(Boolean);
     const existingRoots = pluginRoots.filter((root) => {
       try {
         return fs.existsSync(root) && fs.statSync(root).isDirectory();
@@ -77,44 +79,123 @@ export function createAdminDefaultsManager({ defaultPaths, adminDb, adminService
     if (pluginList.length === 0) {
       throw new Error('No plugins matched selection');
     }
-    const summary = { model: targetModel, scanned: 0, updated: 0, skipped: 0, errors: [] };
-    pluginList.forEach((pluginId) => {
-      let scannedAny = false;
-      existingRoots.forEach((root) => {
-        const manifestPath = path.join(root, pluginId, 'plugin.json');
-        if (!fs.existsSync(manifestPath)) {
+
+    const copyDirRecursiveSync = (sourceDir, targetDir) => {
+      fs.mkdirSync(targetDir, { recursive: true });
+      const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+      entries.forEach((entry) => {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const targetPath = path.join(targetDir, entry.name);
+        if (entry.isDirectory()) {
+          copyDirRecursiveSync(sourcePath, targetPath);
           return;
         }
-        scannedAny = true;
-        summary.scanned += 1;
+        if (entry.isFile()) {
+          if (fs.existsSync(targetPath)) return;
+          fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+          fs.writeFileSync(targetPath, fs.readFileSync(sourcePath));
+          return;
+        }
+        if (entry.isSymbolicLink()) {
+          if (fs.existsSync(targetPath)) return;
+          try {
+            const link = fs.readlinkSync(sourcePath);
+            fs.symlinkSync(link, targetPath);
+          } catch {
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.writeFileSync(targetPath, fs.readFileSync(sourcePath));
+          }
+          return;
+        }
         try {
-          const raw = fs.readFileSync(manifestPath, 'utf8');
-          const manifest = JSON.parse(raw);
-          let changed = false;
-          if (Array.isArray(manifest.agents)) {
-            manifest.agents = manifest.agents.map((agent) => {
-              const next = { ...agent, model: targetModel };
-              if (next.model !== agent.model) changed = true;
-              return next;
-            });
+          const stat = fs.statSync(sourcePath);
+          if (stat.isDirectory()) {
+            copyDirRecursiveSync(sourcePath, targetPath);
+            return;
           }
-          if (Array.isArray(manifest.commands)) {
-            manifest.commands = manifest.commands.map((command) => {
-              const next = { ...command, model: targetModel };
-              if (next.model !== command.model) changed = true;
-              return next;
-            });
+          if (stat.isFile()) {
+            if (fs.existsSync(targetPath)) return;
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.writeFileSync(targetPath, fs.readFileSync(sourcePath));
           }
-          if (changed) {
-            fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-            summary.updated += 1;
-          }
-        } catch (err) {
-          summary.errors.push({ plugin: pluginId, error: err.message || String(err) });
+        } catch {
+          // ignore unknown entries
         }
       });
-      if (!scannedAny) {
-        summary.skipped += 1;
+    };
+
+    const ensureUserCopy = (pluginId) => {
+      if (!userPluginsRoot) return null;
+      const userDir = path.join(userPluginsRoot, pluginId);
+      const builtinDir = builtinPluginsRoot ? path.join(builtinPluginsRoot, pluginId) : null;
+
+      try {
+        if (fs.existsSync(path.join(userDir, 'plugin.json'))) {
+          return userDir;
+        }
+      } catch {
+        // ignore stat errors
+      }
+
+      if (!builtinDir) return null;
+      try {
+        if (!fs.existsSync(path.join(builtinDir, 'plugin.json'))) {
+          return null;
+        }
+      } catch {
+        return null;
+      }
+
+      fs.mkdirSync(userPluginsRoot, { recursive: true });
+      copyDirRecursiveSync(builtinDir, userDir);
+      return userDir;
+    };
+
+    const summary = { model: targetModel, scanned: 0, updated: 0, skipped: 0, errors: [] };
+    pluginList.forEach((pluginId) => {
+      try {
+        const userDir = ensureUserCopy(pluginId);
+        const manifestRoot =
+          userDir ||
+          existingRoots
+            .map((root) => path.join(root, pluginId))
+            .find((dir) => {
+              try {
+                return fs.existsSync(path.join(dir, 'plugin.json'));
+              } catch {
+                return false;
+              }
+            });
+        if (!manifestRoot) {
+          summary.skipped += 1;
+          return;
+        }
+        const manifestPath = path.join(manifestRoot, 'plugin.json');
+        summary.scanned += 1;
+
+        const raw = fs.readFileSync(manifestPath, 'utf8');
+        const manifest = JSON.parse(raw);
+        let changed = false;
+        if (Array.isArray(manifest.agents)) {
+          manifest.agents = manifest.agents.map((agent) => {
+            const next = { ...agent, model: targetModel };
+            if (next.model !== agent.model) changed = true;
+            return next;
+          });
+        }
+        if (Array.isArray(manifest.commands)) {
+          manifest.commands = manifest.commands.map((command) => {
+            const next = { ...command, model: targetModel };
+            if (next.model !== command.model) changed = true;
+            return next;
+          });
+        }
+        if (changed) {
+          fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+          summary.updated += 1;
+        }
+      } catch (err) {
+        summary.errors.push({ plugin: pluginId, error: err.message || String(err) });
       }
     });
     return summary;

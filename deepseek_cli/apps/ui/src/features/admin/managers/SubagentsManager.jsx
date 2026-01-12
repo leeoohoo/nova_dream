@@ -77,8 +77,21 @@ function SubagentsManager({
         plugins: Array.isArray(values.plugins) && values.plugins.length > 0 ? values.plugins : null,
       };
       setSettingModel(true);
-      await onSetModel(payload);
-      message.success('模型已更新');
+      const result = await onSetModel(payload);
+      const updated = Number(result?.updated || 0);
+      const scanned = Number(result?.scanned || 0);
+      const errors = Array.isArray(result?.errors) ? result.errors : [];
+      if (errors.length > 0) {
+        const first = errors[0] || {};
+        const head = [first?.plugin, first?.error].filter(Boolean).join(': ');
+        if (updated > 0) {
+          message.warning(`已更新 ${updated}/${scanned || updated} 个插件，但有 ${errors.length} 个失败：${head || '未知错误'}`);
+        } else {
+          message.error(`更新失败：${head || '未知错误'}`);
+        }
+      } else {
+        message.success(updated > 0 ? `模型已更新（${updated} 个插件）` : '模型已更新');
+      }
     } catch (err) {
       if (err?.errorFields) return;
       message.error(err?.message || '更新模型失败');
