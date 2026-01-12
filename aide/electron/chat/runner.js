@@ -744,6 +744,7 @@ export function createChatRunner({
 
     let currentAssistantId = initialAssistantMessageId;
     const assistantTexts = new Map([[currentAssistantId, '']]);
+    const assistantReasonings = new Map([[currentAssistantId, '']]);
 
     const appendAssistantText = (messageId, delta) => {
       const mid = normalizeId(messageId);
@@ -753,6 +754,16 @@ export function createChatRunner({
       const previous = assistantTexts.get(mid) || '';
       assistantTexts.set(mid, `${previous}${chunk}`);
       sendEvent({ type: 'assistant_delta', sessionId: sid, messageId: mid, delta: chunk });
+    };
+
+    const appendAssistantReasoning = (messageId, delta) => {
+      const mid = normalizeId(messageId);
+      if (!mid) return;
+      const chunk = typeof delta === 'string' ? delta : String(delta || '');
+      if (!chunk) return;
+      const previous = assistantReasonings.get(mid) || '';
+      assistantReasonings.set(mid, `${previous}${chunk}`);
+      sendEvent({ type: 'assistant_reasoning_delta', sessionId: sid, messageId: mid, delta: chunk });
     };
 
     const syncAssistantRecord = (messageId, patch) => {
@@ -772,6 +783,9 @@ export function createChatRunner({
         if (!assistantTexts.has(currentAssistantId)) {
           assistantTexts.set(currentAssistantId, '');
         }
+        if (!assistantReasonings.has(currentAssistantId)) {
+          assistantReasonings.set(currentAssistantId, '');
+        }
         activeRuns.set(sid, { controller, messageId: currentAssistantId });
         return;
       }
@@ -786,6 +800,9 @@ export function createChatRunner({
       if (!assistantTexts.has(currentAssistantId)) {
         assistantTexts.set(currentAssistantId, '');
       }
+      if (!assistantReasonings.has(currentAssistantId)) {
+        assistantReasonings.set(currentAssistantId, '');
+      }
       activeRuns.set(sid, { controller, messageId: currentAssistantId });
       sendEvent({ type: 'assistant_start', sessionId: sid, message: record });
     };
@@ -794,14 +811,25 @@ export function createChatRunner({
       appendAssistantText(currentAssistantId, delta);
     };
 
-    const onAssistantStep = ({ text, toolCalls } = {}) => {
+    const onReasoning = (delta) => {
+      appendAssistantReasoning(currentAssistantId, delta);
+    };
+
+    const onAssistantStep = ({ text, toolCalls, reasoning } = {}) => {
       const mid = normalizeId(currentAssistantId);
       if (!mid) return;
       const streamedText = assistantTexts.get(mid) || '';
       const fallbackText = typeof text === 'string' ? text : '';
       const currentText = streamedText || fallbackText;
+      const streamedReasoning = assistantReasonings.get(mid) || '';
+      const fallbackReasoning = typeof reasoning === 'string' ? reasoning : '';
+      const currentReasoning = streamedReasoning || fallbackReasoning;
       const usableToolCalls = Array.isArray(toolCalls) && toolCalls.length > 0 ? toolCalls : null;
-      const patch = usableToolCalls ? { content: currentText, toolCalls: usableToolCalls } : { content: currentText };
+      const patch = {
+        content: currentText,
+        ...(usableToolCalls ? { toolCalls: usableToolCalls } : {}),
+        ...(currentReasoning ? { reasoning: currentReasoning } : {}),
+      };
       syncAssistantRecord(mid, patch);
     };
 
@@ -844,6 +872,7 @@ export function createChatRunner({
             signal: controller.signal,
             onBeforeRequest,
             onToken,
+            onReasoning,
             onAssistantStep,
             onToolResult,
           });
@@ -856,7 +885,11 @@ export function createChatRunner({
 
         const finalId = normalizeId(currentAssistantId) || initialAssistantMessageId;
         const finalText = assistantTexts.get(finalId) || finalResponseText || '';
-        syncAssistantRecord(finalId, { content: finalText });
+        const finalReasoning = assistantReasonings.get(finalId) || '';
+        syncAssistantRecord(
+          finalId,
+          finalReasoning ? { content: finalText, reasoning: finalReasoning } : { content: finalText }
+        );
         store.sessions.update(sid, { updatedAt: new Date().toISOString() });
         sendEvent({ type: 'assistant_done', sessionId: sid, messageId: finalId });
       } catch (err) {
@@ -864,7 +897,11 @@ export function createChatRunner({
         const message = aborted ? '已停止' : err?.message || String(err);
         const mid = normalizeId(currentAssistantId) || initialAssistantMessageId;
         const existing = assistantTexts.get(mid) || '';
-        syncAssistantRecord(mid, { content: existing || (aborted ? '' : `[error] ${message}`) });
+        const existingReasoning = assistantReasonings.get(mid) || '';
+        syncAssistantRecord(mid, {
+          content: existing || (aborted ? '' : `[error] ${message}`),
+          ...(existingReasoning ? { reasoning: existingReasoning } : {}),
+        });
         store.sessions.update(sid, { updatedAt: new Date().toISOString() });
         sendEvent({
           type: aborted ? 'assistant_aborted' : 'assistant_error',

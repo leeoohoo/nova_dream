@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Alert, Card, Layout, Spin } from 'antd';
+import { Alert, Layout, Spin } from 'antd';
 
 import { hasApi } from '../../lib/api.js';
 import { ChatSidebar } from './components/ChatSidebar.jsx';
@@ -120,20 +120,33 @@ export function ChatView({ admin }) {
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            gap: 12,
             minHeight: 0,
           }}
         >
-          <ChatSessionHeader
-            session={currentSession}
-            streaming={Boolean(streamState)}
-            onPickWorkspaceRoot={pickWorkspaceRoot}
-            onSetWorkspaceRoot={setWorkspaceRoot}
-            onClearWorkspaceRoot={clearWorkspaceRoot}
-          />
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              borderRadius: 16,
+              overflow: 'hidden',
+              background: 'var(--ds-panel-bg)',
+              border: '1px solid var(--ds-panel-border)',
+              boxShadow: 'var(--ds-panel-shadow)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ padding: 12, borderBottom: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
+              <ChatSessionHeader
+                session={currentSession}
+                streaming={Boolean(streamState)}
+                onPickWorkspaceRoot={pickWorkspaceRoot}
+                onSetWorkspaceRoot={setWorkspaceRoot}
+                onClearWorkspaceRoot={clearWorkspaceRoot}
+              />
+            </div>
 
-          <Card size="small" style={{ flex: 1, minHeight: 0, borderRadius: 14 }} styles={{ body: { padding: 0, height: '100%' } }}>
-            <div style={{ height: '100%', minHeight: 0, padding: 12 }}>
+            <div style={{ flex: 1, minHeight: 0, padding: 12 }}>
               <ChatMessages
                 messages={messages}
                 streaming={streamState}
@@ -142,9 +155,8 @@ export function ChatView({ admin }) {
                 onLoadMore={loadMoreMessages}
               />
             </div>
-          </Card>
 
-          <Card size="small" style={{ borderRadius: 14 }} styles={{ body: { padding: 12 } }}>
+            <div style={{ padding: 12, borderTop: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
             <ChatComposer
               value={composerText}
               onChange={setComposerText}
@@ -161,7 +173,8 @@ export function ChatView({ admin }) {
               onStop={stopStreaming}
               sending={Boolean(streamState)}
             />
-          </Card>
+            </div>
+          </div>
         </Content>
       </Layout>
     </>

@@ -61,6 +61,7 @@ export const chatMessageSchema = z.object({
   sessionId: z.string().trim().min(1, 'sessionId is required'),
   role: z.enum(['user', 'assistant', 'tool']),
   content: z.string().optional().default(''),
+  reasoning: z.string().optional().default(''),
   attachments: z.array(imageAttachmentSchema).optional().default([]),
   toolCallId: z.string().trim().optional().default(''),
   toolName: z.string().trim().optional().default(''),

@@ -148,6 +148,24 @@ export function useChatSessions() {
         });
         return;
       }
+      if (type === 'assistant_reasoning_delta') {
+        const mid = normalizeId(payload.messageId);
+        const delta = typeof payload.delta === 'string' ? payload.delta : '';
+        if (!mid || !delta) return;
+        setMessages((prev) => {
+          const list = Array.isArray(prev) ? prev : [];
+          const idx = list.findIndex((m) => normalizeId(m?.id) === mid);
+          if (idx < 0) {
+            const sid = normalizeId(payload.sessionId) || normalizeId(selectedSessionIdRef.current);
+            return [...list, { id: mid, sessionId: sid, role: 'assistant', content: '', reasoning: delta }];
+          }
+          const next = list.slice();
+          const existing = next[idx];
+          next[idx] = { ...existing, reasoning: `${existing?.reasoning || ''}${delta}` };
+          return next;
+        });
+        return;
+      }
       if (type === 'tool_result') {
         const record = payload.message;
         if (!record || typeof record !== 'object') return;

@@ -31,10 +31,11 @@
     "ui:build:release": "node scripts/build-ui.js --release",
     "wsl:embed": "node scripts/embed-wsl-ui-app.js",
     "git:embed": "node scripts/embed-git-ui-app.js",
-    "ui": "node scripts/embed-git-ui-app.js && node scripts/embed-wsl-ui-app.js && node scripts/build-ui.js --skip-if-present && electron electron/main.js",
-    "prepack": "node scripts/embed-git-ui-app.js && node scripts/embed-wsl-ui-app.js && node scripts/build-ui.js --release --skip-if-present",
+    "notepad:embed": "node scripts/embed-notepad-ui-app.js",
+    "ui": "node scripts/embed-git-ui-app.js && node scripts/embed-wsl-ui-app.js && node scripts/embed-notepad-ui-app.js && node scripts/build-ui.js --skip-if-present && electron electron/main.js",
+    "prepack": "node scripts/embed-git-ui-app.js && node scripts/embed-wsl-ui-app.js && node scripts/embed-notepad-ui-app.js && node scripts/build-ui.js --release --skip-if-present",
     "aide:embed": "node scripts/embed-aide-engine.js",
-    "desktop:dist": "npm run aide:embed && npm run git:embed && npm run wsl:embed && npm run ui:build:release && npx --yes electron-builder@24.13.3"
+    "desktop:dist": "npm run aide:embed && npm run git:embed && npm run wsl:embed && npm run notepad:embed && npm run ui:build:release && npx --yes electron-builder@24.13.3"
   },
   "build": {
     "appId": "com.leeoohoo.chatos",
@@ -113,6 +114,7 @@
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "mermaid": "^10.9.1",
     "openai": "^4.76.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

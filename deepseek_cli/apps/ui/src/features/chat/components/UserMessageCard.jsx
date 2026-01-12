@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Space, Tag, Typography } from 'antd';
+import { Space, Tag, Typography } from 'antd';
 
 import { MarkdownBlock } from '../../../components/MarkdownBlock.jsx';
 
@@ -30,47 +30,53 @@ export function UserMessageCard({ message }) {
   }, [message?.attachments]);
 
   return (
-    <Card
-      key={normalizeId(message?.id) || `user_${createdAt || ''}`}
-      size="small"
-      styles={{ body: { padding: 12 } }}
-      style={{ borderRadius: 10 }}
-      title={
-        <Space size={8}>
-          <Tag color="blue">你</Tag>
-          {timeText ? <Text type="secondary">{timeText}</Text> : null}
-        </Space>
-      }
-    >
-      {content ? <MarkdownBlock text={content} alwaysExpanded /> : images.length > 0 ? null : <Text type="secondary">（空）</Text>}
-      {images.length > 0 ? (
-        <div style={{ marginTop: content ? 10 : 0, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {images.map((img) => (
-            <a
-              key={normalizeId(img.id) || img.dataUrl}
-              href={img.dataUrl}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-block' }}
-            >
-              <img
-                src={img.dataUrl}
-                alt={img.name || 'image'}
-                style={{
-                  maxWidth: 240,
-                  maxHeight: 180,
-                  borderRadius: 10,
-                  border: '1px solid var(--ds-panel-border)',
-                  background: 'var(--ds-panel-bg)',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
-              />
-            </a>
-          ))}
-        </div>
-      ) : null}
-    </Card>
+    <div style={{ width: '100%', padding: '4px 0' }}>
+      <Space size={8} wrap>
+        <Tag color="blue" style={{ marginRight: 0 }}>
+          你
+        </Tag>
+        {timeText ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {timeText}
+          </Text>
+        ) : null}
+      </Space>
+
+      <div style={{ marginTop: 6 }}>
+        {content ? (
+          <MarkdownBlock text={content} alwaysExpanded container={false} />
+        ) : images.length > 0 ? null : (
+          <Text type="secondary">（空）</Text>
+        )}
+        {images.length > 0 ? (
+          <div style={{ marginTop: content ? 10 : 0, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {images.map((img) => (
+              <a
+                key={normalizeId(img.id) || img.dataUrl}
+                href={img.dataUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-block' }}
+              >
+                <img
+                  src={img.dataUrl}
+                  alt={img.name || 'image'}
+                  style={{
+                    maxWidth: 240,
+                    maxHeight: 180,
+                    borderRadius: 10,
+                    border: '1px solid var(--ds-panel-border)',
+                    background: 'var(--ds-panel-bg)',
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              </a>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

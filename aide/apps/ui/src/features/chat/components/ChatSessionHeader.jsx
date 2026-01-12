@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Input, Space, Tag, Typography } from 'antd';
+import { Button, Input, Space, Tag, Typography } from 'antd';
 import { CloseCircleOutlined, FolderOpenOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -20,7 +20,7 @@ export function ChatSessionHeader({ session, streaming, onPickWorkspaceRoot, onS
   const workspaceRoot = normalizePath(session?.workspaceRoot);
 
   return (
-    <Card size="small" style={{ borderRadius: 14 }} styles={{ body: { padding: 12 } }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ fontWeight: 650, fontSize: 16, lineHeight: '22px' }}>{title}</div>
         <Space size={8} wrap>
@@ -56,7 +56,7 @@ export function ChatSessionHeader({ session, streaming, onPickWorkspaceRoot, onS
       <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
         该会话的 MCP 工具会以此目录作为 root。
       </Text>
-    </Card>
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Space, Tag, Typography } from 'antd';
+import { Collapse, Space, Tag, Typography } from 'antd';
 
 import { MarkdownBlock } from '../../../components/MarkdownBlock.jsx';
 import { PopoverTag } from './PopoverTag.jsx';
@@ -51,6 +51,7 @@ export function AssistantTurnCard({ messages, streaming }) {
   const blocks = useMemo(() => {
     const out = [];
     const toolResultsByCallId = new Map();
+
     list.forEach((msg) => {
       if (msg?.role !== 'tool') return;
       const callId = normalizeId(msg?.toolCallId);
@@ -62,11 +63,23 @@ export function AssistantTurnCard({ messages, streaming }) {
         toolResultsByCallId.set(callId, [msg]);
       }
     });
+
     const consumedToolMessageIds = new Set();
 
     list.forEach((msg, msgIdx) => {
       if (!msg) return;
+
       if (msg.role === 'assistant') {
+        const reasoning =
+          typeof msg?.reasoning === 'string' ? msg.reasoning : String(msg?.reasoning || '');
+        if (reasoning.trim()) {
+          out.push({
+            type: 'assistant_reasoning',
+            key: `${normalizeId(msg?.id) || `assistant_${msgIdx}`}_reasoning`,
+            content: reasoning,
+          });
+        }
+
         const content = typeof msg?.content === 'string' ? msg.content : String(msg?.content || '');
         if (content.trim()) {
           out.push({
@@ -75,6 +88,7 @@ export function AssistantTurnCard({ messages, streaming }) {
             content,
           });
         }
+
         const calls = Array.isArray(msg?.toolCalls) ? msg.toolCalls.filter(Boolean) : [];
         if (calls.length > 0) {
           const invocations = calls.map((call, idx) => {
@@ -84,12 +98,14 @@ export function AssistantTurnCard({ messages, streaming }) {
               const mid = normalizeId(res?.id);
               if (mid) consumedToolMessageIds.add(mid);
             });
+
             const nameFromCall = getToolName(call);
             const nameFromResult =
               results.length > 0 && typeof results?.[0]?.toolName === 'string'
                 ? results[0].toolName.trim()
                 : '';
             const name = nameFromCall || nameFromResult || 'tool';
+
             return {
               callId,
               name,
@@ -98,6 +114,7 @@ export function AssistantTurnCard({ messages, streaming }) {
               key: callId || `${normalizeId(msg?.id) || `assistant_${msgIdx}`}_${name}_${idx}`,
             };
           });
+
           out.push({
             type: 'tool_invocations',
             key: `${normalizeId(msg?.id) || `assistant_${msgIdx}`}_tool_invocations`,
@@ -105,8 +122,10 @@ export function AssistantTurnCard({ messages, streaming }) {
             assistantId: normalizeId(msg?.id),
           });
         }
+
         return;
       }
+
       if (msg.role === 'tool') {
         const mid = normalizeId(msg?.id);
         if (mid && consumedToolMessageIds.has(mid)) {
@@ -117,96 +136,150 @@ export function AssistantTurnCard({ messages, streaming }) {
           last.results.push(msg);
           return;
         }
-        out.push({ type: 'tool_orphans', key: normalizeId(msg?.id) || `tool_${msgIdx}`, results: [msg] });
+        out.push({ type: 'tool_orphans', key: mid || `tool_${msgIdx}`, results: [msg] });
       }
     });
+
     return out;
   }, [list]);
 
   const hasBlocks = blocks.length > 0;
   const isStreaming = Boolean(
-    streaming?.messageId && list.some((m) => normalizeId(m?.id) === normalizeId(streaming.messageId))
+    streaming?.messageId &&
+      list.some((m) => normalizeId(m?.id) === normalizeId(streaming.messageId))
   );
 
   return (
-    <Card
-      size="small"
-      styles={{ body: { padding: 12 } }}
-      style={{ borderRadius: 10 }}
-      title={
-        <Space size={8}>
-          <Tag color="green">AI</Tag>
-          {timeText ? <Text type="secondary">{timeText}</Text> : null}
-          {isStreaming ? <Text type="secondary">（输出中…）</Text> : null}
-        </Space>
-      }
-    >
-      {hasBlocks ? (
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
-          {blocks.map((block) => {
-            if (block.type === 'assistant') {
-              return <MarkdownBlock key={block.key} text={block.content} alwaysExpanded />;
-            }
-            if (block.type === 'tool_invocations') {
-              return (
-                <Space key={block.key} size={[4, 4]} wrap>
-                  {(Array.isArray(block.invocations) ? block.invocations : []).map((invocation, idx) => {
-                    const name = invocation?.name || 'tool';
-                    const callId = normalizeId(invocation?.callId);
-                    const args = typeof invocation?.args === 'string' ? invocation.args : String(invocation?.args || '');
-                    const resultText =
-                      typeof invocation?.resultText === 'string'
-                        ? invocation.resultText
-                        : String(invocation?.resultText || '');
-                    const key = invocation?.key || callId || `${block.assistantId || block.key}_${name}_${idx}`;
-                    const title = `${name}${callId ? ` · ${callId}` : ''}`;
-                    return (
-                      <PopoverTag key={key} color={resultText ? 'purple' : 'gold'} text={name} title={title}>
-                        <div>
-                          {args ? (
-                            <>
-                              <Text type="secondary">参数</Text>
-                              <pre style={{ margin: '6px 0 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                {args}
-                              </pre>
-                            </>
-                          ) : null}
-                          <Text type="secondary">结果</Text>
-                          {resultText ? <MarkdownBlock text={resultText} maxHeight={320} /> : <Text type="secondary">（暂无结果）</Text>}
-                        </div>
-                      </PopoverTag>
-                    );
-                  })}
-                </Space>
-              );
-            }
-            if (block.type === 'tool_orphans') {
-              return (
-                <Space key={block.key} size={[4, 4]} wrap>
-                  {(Array.isArray(block.results) ? block.results : []).map((result, idx) => {
-                    const name = typeof result?.toolName === 'string' ? result.toolName.trim() : '';
-                    const callId = normalizeId(result?.toolCallId);
-                    const content = typeof result?.content === 'string' ? result.content : String(result?.content || '');
-                    const key = normalizeId(result?.id) || `${name || 'tool'}_${callId || ''}_${idx}`;
-                    const title = `${name || 'tool'}${callId ? ` · ${callId}` : ''}`;
-                    return (
-                      <PopoverTag key={key} color="purple" text={name || 'tool'} title={title}>
-                        <div>
-                          <Text type="secondary">结果</Text>
-                          {content ? <MarkdownBlock text={content} maxHeight={320} alwaysExpanded /> : <Text type="secondary">（空）</Text>}
-                        </div>
-                      </PopoverTag>
-                    );
-                  })}
-                </Space>
-              );
-            }
-            return null;
-          })}
-        </Space>
-      ) : (
-        <Text type="secondary">（无内容）</Text>
-      )}
-    </Card>
+    <div style={{ width: '100%', padding: '4px 0' }}>
+      <Space size={8} wrap>
+        <Tag color="green" style={{ marginRight: 0 }}>
+          AI
+        </Tag>
+        {timeText ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {timeText}
+          </Text>
+        ) : null}
+        {isStreaming ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            （输出中…）
+          </Text>
+        ) : null}
+      </Space>
+
+      <div style={{ marginTop: 6 }}>
+        {hasBlocks ? (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            {blocks.map((block) => {
+              if (block.type === 'assistant') {
+                return <MarkdownBlock key={block.key} text={block.content} alwaysExpanded container={false} />;
+              }
+
+              if (block.type === 'assistant_reasoning') {
+                const reasoningText =
+                  typeof block?.content === 'string' ? block.content : String(block?.content || '');
+                const previewRaw = reasoningText.trim().replace(/\s+/g, ' ').slice(0, 86);
+                const preview =
+                  previewRaw && reasoningText.trim().length > previewRaw.length ? `${previewRaw}…` : previewRaw;
+
+                return (
+                  <Collapse
+                    key={block.key}
+                    ghost
+                    size="small"
+                    items={[
+                      {
+                        key: 'reasoning',
+                        label: (
+                          <Space size={6} wrap>
+                            <Tag color="gold" style={{ marginRight: 0 }}>
+                              思考过程
+                            </Tag>
+                            {preview ? <Text type="secondary">{preview}</Text> : null}
+                          </Space>
+                        ),
+                        children: (
+                          <MarkdownBlock text={reasoningText} maxHeight={240} alwaysExpanded container={false} />
+                        ),
+                      },
+                    ]}
+                  />
+                );
+              }
+
+              if (block.type === 'tool_invocations') {
+                return (
+                  <Space key={block.key} size={[4, 4]} wrap>
+                    {(Array.isArray(block.invocations) ? block.invocations : []).map((invocation, idx) => {
+                      const name = invocation?.name || 'tool';
+                      const callId = normalizeId(invocation?.callId);
+                      const args = typeof invocation?.args === 'string' ? invocation.args : String(invocation?.args || '');
+                      const resultText =
+                        typeof invocation?.resultText === 'string'
+                          ? invocation.resultText
+                          : String(invocation?.resultText || '');
+                      const key = invocation?.key || callId || `${block.assistantId || block.key}_${name}_${idx}`;
+                      const title = `${name}${callId ? ` · ${callId}` : ''}`;
+
+                      return (
+                        <PopoverTag key={key} color={resultText ? 'purple' : 'gold'} text={name} title={title}>
+                          <div>
+                            {args ? (
+                              <>
+                                <Text type="secondary">参数</Text>
+                                <pre style={{ margin: '6px 0 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                  {args}
+                                </pre>
+                              </>
+                            ) : null}
+                            <Text type="secondary">结果</Text>
+                            {resultText ? (
+                              <MarkdownBlock text={resultText} maxHeight={320} container={false} />
+                            ) : (
+                              <Text type="secondary">（暂无结果）</Text>
+                            )}
+                          </div>
+                        </PopoverTag>
+                      );
+                    })}
+                  </Space>
+                );
+              }
+
+              if (block.type === 'tool_orphans') {
+                return (
+                  <Space key={block.key} size={[4, 4]} wrap>
+                    {(Array.isArray(block.results) ? block.results : []).map((result, idx) => {
+                      const name = typeof result?.toolName === 'string' ? result.toolName.trim() : '';
+                      const callId = normalizeId(result?.toolCallId);
+                      const content = typeof result?.content === 'string' ? result.content : String(result?.content || '');
+                      const key = normalizeId(result?.id) || `${name || 'tool'}_${callId || ''}_${idx}`;
+                      const title = `${name || 'tool'}${callId ? ` · ${callId}` : ''}`;
+
+                      return (
+                        <PopoverTag key={key} color="purple" text={name || 'tool'} title={title}>
+                          <div>
+                            <Text type="secondary">结果</Text>
+                            {content ? (
+                              <MarkdownBlock text={content} maxHeight={320} alwaysExpanded container={false} />
+                            ) : (
+                              <Text type="secondary">（空）</Text>
+                            )}
+                          </div>
+                        </PopoverTag>
+                      );
+                    })}
+                  </Space>
+                );
+              }
+
+              return null;
+            })}
+          </Space>
+        ) : (
+          <Text type="secondary">（无内容）</Text>
+        )}
+      </div>
+    </div>
   );
 }
