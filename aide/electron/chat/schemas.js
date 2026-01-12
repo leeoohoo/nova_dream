@@ -13,6 +13,16 @@ const toolCallSchema = z
   })
   .passthrough();
 
+const imageAttachmentSchema = z
+  .object({
+    id: z.string().trim().optional().default(''),
+    type: z.literal('image').optional().default('image'),
+    name: z.string().trim().optional().default(''),
+    mimeType: z.string().trim().optional().default(''),
+    dataUrl: z.string().trim().min(1, 'dataUrl is required'),
+  })
+  .passthrough();
+
 export const chatAgentSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1, 'name is required'),
@@ -51,6 +61,7 @@ export const chatMessageSchema = z.object({
   sessionId: z.string().trim().min(1, 'sessionId is required'),
   role: z.enum(['user', 'assistant', 'tool']),
   content: z.string().optional().default(''),
+  attachments: z.array(imageAttachmentSchema).optional().default([]),
   toolCallId: z.string().trim().optional().default(''),
   toolName: z.string().trim().optional().default(''),
   toolCalls: z.array(toolCallSchema).optional(),

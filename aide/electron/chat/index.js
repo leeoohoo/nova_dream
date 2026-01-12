@@ -32,6 +32,48 @@ function validateWorkspaceRoot(value) {
   return resolved;
 }
 
+function extractMimeTypeFromDataUrl(dataUrl) {
+  const raw = typeof dataUrl === 'string' ? dataUrl : '';
+  const match = raw.match(/^data:([^;]+);base64,/i);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return '';
+}
+
+function normalizeImageAttachments(input) {
+  const list = Array.isArray(input) ? input : [];
+  const out = [];
+  const MAX_IMAGES = 4;
+  for (const entry of list) {
+    if (out.length >= MAX_IMAGES) break;
+    let dataUrl = '';
+    let id = '';
+    let name = '';
+    let mimeType = '';
+    if (typeof entry === 'string') {
+      dataUrl = entry.trim();
+    } else if (entry && typeof entry === 'object') {
+      id = normalizeId(entry.id);
+      name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      mimeType = typeof entry.mimeType === 'string' ? entry.mimeType.trim() : '';
+      dataUrl = typeof entry.dataUrl === 'string' ? entry.dataUrl.trim() : typeof entry.url === 'string' ? entry.url.trim() : '';
+    }
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) continue;
+    if (!mimeType) {
+      mimeType = extractMimeTypeFromDataUrl(dataUrl);
+    }
+    out.push({
+      id: id || `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      type: 'image',
+      name,
+      mimeType,
+      dataUrl,
+    });
+  }
+  return out;
+}
+
 export function registerChatApi(ipcMain, options = {}) {
   const {
     adminDb,
@@ -155,15 +197,35 @@ export function registerChatApi(ipcMain, options = {}) {
   ipcMain.handle('chat:send', async (_event, payload = {}) => {
     const sessionId = normalizeId(payload?.sessionId);
     const text = typeof payload?.text === 'string' ? payload.text : typeof payload?.content === 'string' ? payload.content : '';
+    const attachmentPayload = Array.isArray(payload?.attachments)
+      ? payload.attachments
+      : Array.isArray(payload?.images)
+        ? payload.images
+        : [];
+    const attachments = normalizeImageAttachments(attachmentPayload);
     if (!sessionId) throw new Error('sessionId is required');
-    if (!text.trim()) throw new Error('text is required');
+    if (!text.trim() && attachments.length === 0) {
+      throw new Error('text is required');
+    }
 
     const session = store.sessions.get(sessionId);
     if (!session) throw new Error('session not found');
     const agentId = normalizeId(payload?.agentId) || normalizeId(session?.agentId);
     if (!agentId) throw new Error('agentId is required');
 
-    const userMessage = store.messages.create({ sessionId, role: 'user', content: text });
+    const agent = store.agents.get(agentId);
+    if (!agent) throw new Error('agent not found');
+
+    if (attachments.length > 0) {
+      const models = adminServices.models.list();
+      const modelRecord = models.find((m) => m?.id === agent.modelId);
+      if (!modelRecord) throw new Error('model not found for agent');
+      if (modelRecord.supportsVision !== true) {
+        throw new Error('当前模型未启用图片理解：请在 Admin → Models 中开启“支持图片理解”。');
+      }
+    }
+
+    const userMessage = store.messages.create({ sessionId, role: 'user', content: text, attachments });
     const assistantMessage = store.messages.create({ sessionId, role: 'assistant', content: '' });
     store.sessions.update(sessionId, { updatedAt: new Date().toISOString() });
 
@@ -175,6 +237,7 @@ export function registerChatApi(ipcMain, options = {}) {
           userMessageId: userMessage.id,
           assistantMessageId: assistantMessage.id,
           text,
+          attachments,
         })
       )
       .catch((err) => {

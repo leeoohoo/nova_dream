@@ -28,6 +28,13 @@ class ChatSession {
         delete message.reasoning_content;
       }
     });
+    if (Array.isArray(content)) {
+      this.messages.push({
+        role: 'user',
+        content: content.map((part) => (part && typeof part === 'object' ? { ...part } : part)),
+      });
+      return;
+    }
     this.messages.push({ role: 'user', content: String(content) });
   }
 
@@ -57,8 +64,27 @@ class ChatSession {
   getLastUserMessage() {
     for (let i = this.messages.length - 1; i >= 0; i -= 1) {
       const message = this.messages[i];
-      if (message && message.role === 'user' && typeof message.content === 'string') {
+      if (!message || message.role !== 'user') {
+        continue;
+      }
+      if (typeof message.content === 'string') {
         return message.content;
+      }
+      if (Array.isArray(message.content)) {
+        const text = message.content
+          .map((part) => {
+            if (!part) return '';
+            if (typeof part === 'string') {
+              return part;
+            }
+            if (typeof part.text === 'string') {
+              return part.text;
+            }
+            return '';
+          })
+          .join('')
+          .trim();
+        return text;
       }
     }
     return '';

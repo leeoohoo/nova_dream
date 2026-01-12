@@ -16,6 +16,7 @@ export function useChatSessions() {
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [composerText, setComposerText] = useState('');
+  const [composerAttachments, setComposerAttachments] = useState([]);
   const [streamState, setStreamState] = useState(null);
 
   const selectedSessionIdRef = useRef('');
@@ -339,23 +340,25 @@ export function useChatSessions() {
 
   const sendMessage = async () => {
     const text = typeof composerText === 'string' ? composerText.trim() : '';
-    if (!text || streamStateRef.current) return;
+    const attachments = Array.isArray(composerAttachments) ? composerAttachments.filter(Boolean) : [];
+    if ((!text && attachments.length === 0) || streamStateRef.current) return;
     const sid = normalizeId(selectedSessionIdRef.current);
     if (!sid) {
       toast.error('请先创建会话');
       return;
     }
     try {
-      const res = await api.invoke('chat:send', { sessionId: sid, text });
+      const res = await api.invoke('chat:send', { sessionId: sid, text, attachments });
       if (res?.ok === false) throw new Error(res?.message || '发送失败');
 
       const userMessageId = normalizeId(res?.userMessageId);
       const assistantMessageId = normalizeId(res?.assistantMessageId);
       const now = new Date().toISOString();
       setComposerText('');
+      setComposerAttachments([]);
       setMessages((prev) => [
         ...prev,
-        { id: userMessageId || `user_${now}`, sessionId: sid, role: 'user', content: text, createdAt: now, updatedAt: now },
+        { id: userMessageId || `user_${now}`, sessionId: sid, role: 'user', content: text, attachments, createdAt: now, updatedAt: now },
         { id: assistantMessageId || `assistant_${now}`, sessionId: sid, role: 'assistant', content: '', createdAt: now, updatedAt: now },
       ]);
       setStreamState({ sessionId: sid, messageId: assistantMessageId });
@@ -384,9 +387,11 @@ export function useChatSessions() {
     selectedSessionId,
     selectedAgentId,
     composerText,
+    composerAttachments,
     streamState,
     currentSession,
     setComposerText,
+    setComposerAttachments,
     refreshSessions,
     refreshMessages,
     refreshAll,

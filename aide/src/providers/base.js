@@ -46,7 +46,13 @@ export class ModelProvider {
       }
       const normalizedEntry = { role };
       if (message.content !== undefined) {
-        normalizedEntry.content = String(message.content ?? '');
+        if (Array.isArray(message.content)) {
+          normalizedEntry.content = message.content.map((part) =>
+            part && typeof part === 'object' ? { ...part } : part
+          );
+        } else {
+          normalizedEntry.content = String(message.content ?? '');
+        }
       }
       if (message.tool_call_id !== undefined && message.tool_call_id !== null) {
         normalizedEntry.tool_call_id = String(message.tool_call_id);

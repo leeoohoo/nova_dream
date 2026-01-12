@@ -9,6 +9,7 @@ export const TABLE_SCHEMAS = {
       { name: 'name', type: 'string', required: true, note: '业务别名/标识符' },
       { name: 'provider', type: 'string', required: true, note: '如 openai/azure/etc' },
       { name: 'model', type: 'string', required: true, note: '具体模型 ID' },
+      { name: 'supportsVision', type: 'boolean', required: false, note: '是否支持图片理解/输入' },
       { name: 'reasoningEffort', type: 'enum(low|medium|high)', required: false, note: '可选推理等级（仅部分模型支持）' },
       { name: 'baseUrl', type: 'string', required: false, note: '可选自定义网关' },
       { name: 'apiKeyEnv', type: 'string', required: false, note: '读取密钥的环境变量' },
@@ -154,6 +155,7 @@ export const modelSchema = z.object({
   tools: z.array(z.string().trim()).optional().default([]),
   description: z.string().trim().optional().default(''),
   isDefault: z.boolean().optional().default(false),
+  supportsVision: z.boolean().optional().default(false),
 });
 
 export const secretSchema = z.object({

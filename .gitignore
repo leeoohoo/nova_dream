@@ -9,7 +9,23 @@ dist/
 dist_desktop/
 dist_engine/
 build/
-
+dist_desktop*/
+dist_desktop_*/
+deepseek_cli/dist*/
+deepseek_cli/dist_*/
+*.exe
+*.zip
+*.msi
+*.dmg
+*.deb
+*.rpm
+*.dll
+*.so
+*.dylib
+/win-unpacked/
+/linux-unpacked/
+/mac-unpacked/
+/release-builds/
 # Temporary files
 tmp/
 .tmp/

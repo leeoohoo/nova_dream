@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, Card, Layout, Spin } from 'antd';
 
 import { hasApi } from '../../lib/api.js';
@@ -9,6 +9,10 @@ import { ChatComposer } from './components/ChatComposer.jsx';
 import { useChatController } from './hooks/useChatController.js';
 
 const { Sider, Content } = Layout;
+
+function normalizeId(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
 
 export function ChatView({ admin }) {
   const controller = useChatController({ admin });
@@ -22,9 +26,11 @@ export function ChatView({ admin }) {
     selectedAgentId,
     selectedSessionId,
     composerText,
+    composerAttachments,
     streamState,
     currentSession,
     setComposerText,
+    setComposerAttachments,
     refreshAll,
     selectSession,
     loadMoreMessages,
@@ -38,6 +44,21 @@ export function ChatView({ admin }) {
     sendMessage,
     stopStreaming,
   } = controller;
+
+  const models = useMemo(() => (Array.isArray(admin?.models) ? admin.models : []), [admin]);
+  const modelById = useMemo(() => new Map(models.map((m) => [normalizeId(m?.id), m])), [models]);
+  const selectedAgent = useMemo(
+    () =>
+      Array.isArray(agents)
+        ? agents.find((a) => normalizeId(a?.id) === normalizeId(selectedAgentId)) || null
+        : null,
+    [agents, selectedAgentId]
+  );
+  const selectedModel = useMemo(
+    () => (selectedAgent ? modelById.get(normalizeId(selectedAgent.modelId)) : null),
+    [modelById, selectedAgent]
+  );
+  const visionEnabled = Boolean(selectedModel?.supportsVision);
 
   if (!hasApi) {
     return <Alert type="error" message="IPC bridge not available. Is preload loaded?" />;
@@ -127,6 +148,9 @@ export function ChatView({ admin }) {
             <ChatComposer
               value={composerText}
               onChange={setComposerText}
+              attachments={composerAttachments}
+              onAttachmentsChange={setComposerAttachments}
+              visionEnabled={visionEnabled}
               onSend={async () => {
                 try {
                   await sendMessage();

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Button, Popconfirm, Space, Tag, Typography, message } from 'antd';
+import React, { useMemo } from 'react';
+import { Button, Popconfirm, Space, Tag, Typography } from 'antd';
 
 import { EntityManager } from '../../../components/EntityManager.jsx';
 
@@ -16,11 +16,9 @@ function ModelsManager({
   onUpdate,
   onDelete,
   onSetDefault = () => {},
-  onSetSubagentModel,
   loading,
   developerMode = false,
 }) {
-  const [settingSubagentModelId, setSettingSubagentModelId] = useState(null);
   const providerOptions = useMemo(() => {
     const shouldShowAzure =
       developerMode ||
@@ -36,6 +34,12 @@ function ModelsManager({
       { title: '名称', dataIndex: 'name', width: 140 },
       { title: 'Provider', dataIndex: 'provider', width: 120 },
       { title: '模型 ID', dataIndex: 'model', width: 200 },
+      {
+        title: '图片理解',
+        dataIndex: 'supportsVision',
+        width: 110,
+        render: (v) => (v ? <Tag color="purple">支持</Tag> : '-'),
+      },
       {
         title: '思考等级',
         dataIndex: 'reasoningEffort',
@@ -107,27 +111,16 @@ function ModelsManager({
       { name: 'apiKeyEnv', label: 'API Key Env', placeholder: '如 OPENAI_API_KEY' },
       { name: 'description', label: '描述', type: 'textarea', rows: 2 },
       { name: 'isDefault', label: '设为默认', type: 'switch', defaultValue: false },
+      {
+        name: 'supportsVision',
+        label: '支持图片理解',
+        type: 'switch',
+        defaultValue: false,
+        extra: '开启后，对话输入框可粘贴/上传图片，并以 base64(data URL) 发送给模型。',
+      },
     ],
     [providerOptions]
   );
-
-  const handleSetSubagentModel = async (record) => {
-    if (typeof onSetSubagentModel !== 'function') return;
-    const targetModel = typeof record?.name === 'string' ? record.name.trim() : '';
-    if (!targetModel) {
-      message.error('模型名称为空，无法设为 Sub-agent 模型');
-      return;
-    }
-    setSettingSubagentModelId(record?.id ?? targetModel);
-    try {
-      await onSetSubagentModel({ model: targetModel, plugins: null });
-      message.success('Sub-agent 模型已更新');
-    } catch (err) {
-      message.error(err?.message || '更新 Sub-agent 模型失败');
-    } finally {
-      setSettingSubagentModelId(null);
-    }
-  };
 
   return (
     <EntityManager
@@ -152,15 +145,6 @@ function ModelsManager({
           </Popconfirm>
           <Button size="small" type="link" disabled={record.isDefault} onClick={() => onSetDefault(record.id)}>
             设为默认
-          </Button>
-          <Button
-            size="small"
-            type="link"
-            disabled={typeof onSetSubagentModel !== 'function'}
-            loading={settingSubagentModelId === (record?.id ?? record?.name)}
-            onClick={() => handleSetSubagentModel(record)}
-          >
-            设为 Sub-agent 模型
           </Button>
         </Space>
       )}

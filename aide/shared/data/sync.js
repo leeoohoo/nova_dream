@@ -28,9 +28,12 @@ function buildModelsYamlPayload(models = []) {
         : typeof m.reasoning_effort === 'string'
           ? m.reasoning_effort
           : '';
+    const supportsVision = Boolean(m.supportsVision ?? m.supports_vision);
     result[m.name] = {
       provider: m.provider || '',
       model: m.model || '',
+      supports_vision: supportsVision || undefined,
+      supportsVision: supportsVision || undefined,
       reasoning_effort: reasoningEffort || undefined,
       reasoningEffort: reasoningEffort || undefined,
       base_url: m.baseUrl || m.base_url || '',

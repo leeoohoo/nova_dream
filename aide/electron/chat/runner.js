@@ -65,6 +65,52 @@ function normalizeMcpServerName(value) {
     .replace(/^_+|_+$/g, '');
 }
 
+function normalizeImageDataUrl(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  if (!raw.startsWith('data:image/')) return '';
+  return raw;
+}
+
+function normalizeImageAttachments(value) {
+  const list = Array.isArray(value) ? value : [];
+  const out = [];
+  const seen = new Set();
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') continue;
+    const id = normalizeId(entry.id);
+    const dataUrl = normalizeImageDataUrl(entry.dataUrl || entry.url);
+    if (!dataUrl) continue;
+    const dedupeKey = id || dataUrl;
+    if (dedupeKey && seen.has(dedupeKey)) continue;
+    if (dedupeKey) seen.add(dedupeKey);
+    out.push({
+      id,
+      type: 'image',
+      name: typeof entry.name === 'string' ? entry.name.trim() : '',
+      mimeType: typeof entry.mimeType === 'string' ? entry.mimeType.trim() : '',
+      dataUrl,
+    });
+  }
+  return out;
+}
+
+function buildUserMessageContent({ text, attachments, allowVisionInput } = {}) {
+  const trimmedText = typeof text === 'string' ? text.trim() : '';
+  const images = allowVisionInput ? normalizeImageAttachments(attachments) : [];
+  const parts = [];
+  if (trimmedText) {
+    parts.push({ type: 'text', text: trimmedText });
+  }
+  images.forEach((img) => {
+    if (!img?.dataUrl) return;
+    parts.push({ type: 'image_url', image_url: { url: img.dataUrl } });
+  });
+  if (parts.length === 0) return null;
+  if (parts.length === 1 && parts[0].type === 'text') return parts[0].text;
+  return parts;
+}
+
 function getMcpPromptNameForServer(serverName, language) {
   const base = `mcp_${normalizeMcpServerName(serverName)}`;
   const lang = normalizePromptLanguage(language);
@@ -360,12 +406,14 @@ export function createChatRunner({
     }
   };
 
-  const start = async ({ sessionId, agentId, userMessageId, assistantMessageId, text } = {}) => {
+  const start = async ({ sessionId, agentId, userMessageId, assistantMessageId, text, attachments } = {}) => {
     const sid = normalizeId(sessionId);
     const normalizedText = typeof text === 'string' ? text.trim() : '';
     const initialAssistantMessageId = normalizeId(assistantMessageId);
     if (!sid) throw new Error('sessionId is required');
-    if (!normalizedText) throw new Error('text is required');
+    if (!normalizedText && (!Array.isArray(attachments) || attachments.length === 0)) {
+      throw new Error('text is required');
+    }
     if (!initialAssistantMessageId) throw new Error('assistantMessageId is required');
 
     if (activeRuns.has(sid)) {
@@ -389,6 +437,7 @@ export function createChatRunner({
     if (!modelRecord) {
       throw new Error('model not found for agent');
     }
+    const allowVisionInput = modelRecord.supportsVision === true;
 
     const { ChatSession, ModelClient, createAppConfigFromModels, runWithSubAgentContext } = await loadEngineDeps();
 
@@ -651,7 +700,14 @@ export function createChatRunner({
     history.forEach((msg) => {
       const role = msg?.role;
       if (role === 'user') {
-        chatSession.addUser(msg?.content || '');
+        const content = buildUserMessageContent({
+          text: msg?.content || '',
+          attachments: msg?.attachments,
+          allowVisionInput,
+        });
+        if (content) {
+          chatSession.addUser(content);
+        }
         pendingToolCallIds = null;
         return;
       }
@@ -676,7 +732,15 @@ export function createChatRunner({
         pendingToolCallIds.delete(callId);
       }
     });
-    chatSession.addUser(normalizedText);
+    const currentUserContent = buildUserMessageContent({
+      text: normalizedText,
+      attachments,
+      allowVisionInput,
+    });
+    if (!currentUserContent) {
+      throw new Error('text is required');
+    }
+    chatSession.addUser(currentUserContent);
 
     let currentAssistantId = initialAssistantMessageId;
     const assistantTexts = new Map([[currentAssistantId, '']]);
