@@ -40,13 +40,21 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
 
   const btnNewFolder = document.createElement('button');
   btnNewFolder.type = 'button';
-  btnNewFolder.className = 'np-btn';
-  btnNewFolder.textContent = '新建文件夹';
+  btnNewFolder.className = 'np-btn np-btn-icon';
+  btnNewFolder.title = '新建文件夹';
+  btnNewFolder.setAttribute('aria-label', '新建文件夹');
+  const btnNewFolderIcon = document.createElement('span');
+  btnNewFolderIcon.className = 'ds-tree-icon ds-tree-icon-new-folder';
+  btnNewFolder.appendChild(btnNewFolderIcon);
 
   const btnNewNote = document.createElement('button');
   btnNewNote.type = 'button';
-  btnNewNote.className = 'np-btn';
-  btnNewNote.textContent = '新建笔记';
+  btnNewNote.className = 'np-btn np-btn-icon';
+  btnNewNote.title = '新建笔记';
+  btnNewNote.setAttribute('aria-label', '新建笔记');
+  const btnNewNoteIcon = document.createElement('span');
+  btnNewNoteIcon.className = 'ds-tree-icon ds-tree-icon-new-note';
+  btnNewNote.appendChild(btnNewNoteIcon);
 
   const btnSave = document.createElement('button');
   btnSave.type = 'button';
@@ -79,37 +87,9 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
   const leftBody = document.createElement('div');
   leftBody.className = 'np-card-body';
 
-  const createSection = document.createElement('div');
-  const createTitle = document.createElement('div');
-  createTitle.className = 'np-section-title';
-  createTitle.textContent = '新建';
-
-  const createFolderRow = document.createElement('div');
-  createFolderRow.className = 'np-row';
-  const newFolderInput = document.createElement('input');
-  newFolderInput.className = 'np-input';
-  newFolderInput.type = 'text';
-  newFolderInput.placeholder = '文件夹路径，例如：work/ideas';
-  createFolderRow.appendChild(newFolderInput);
-  createFolderRow.appendChild(btnNewFolder);
-
-  const createNoteRow = document.createElement('div');
-  createNoteRow.className = 'np-row';
-  const newNoteTitleInput = document.createElement('input');
-  newNoteTitleInput.className = 'np-input';
-  newNoteTitleInput.type = 'text';
-  newNoteTitleInput.placeholder = '笔记标题（可空）';
-  createNoteRow.appendChild(newNoteTitleInput);
-  createNoteRow.appendChild(btnNewNote);
-
   const createHint = document.createElement('div');
-  createHint.className = 'np-meta';
+  createHint.className = 'np-meta np-create-hint';
   createHint.textContent = '新笔记将创建在：根目录';
-
-  createSection.appendChild(createTitle);
-  createSection.appendChild(createFolderRow);
-  createSection.appendChild(createNoteRow);
-  createSection.appendChild(createHint);
 
   const searchInput = document.createElement('input');
   searchInput.className = 'np-input';
@@ -118,36 +98,33 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
 
   const folderSection = document.createElement('div');
   const folderTitle = document.createElement('div');
-  folderTitle.className = 'np-section-title';
-  folderTitle.textContent = '文件夹';
+  folderTitle.className = 'np-section-title np-section-title-row';
+  const folderTitleLabel = document.createElement('div');
+  folderTitleLabel.textContent = '笔记';
+  const folderTitleActions = document.createElement('div');
+  folderTitleActions.className = 'np-section-actions';
+  folderTitleActions.appendChild(btnNewNote);
+  folderTitleActions.appendChild(btnNewFolder);
+  folderTitle.appendChild(folderTitleLabel);
+  folderTitle.appendChild(folderTitleActions);
   const folderList = document.createElement('div');
-  folderList.className = 'np-list';
+  folderList.className = 'ds-tree';
   folderSection.appendChild(folderTitle);
   folderSection.appendChild(folderList);
+  folderSection.appendChild(createHint);
 
   const tagSection = document.createElement('div');
   const tagTitle = document.createElement('div');
   tagTitle.className = 'np-section-title';
-  tagTitle.textContent = '标签';
+  tagTitle.textContent = '标签过滤';
   const tagRow = document.createElement('div');
   tagRow.className = 'np-chip-row';
   tagSection.appendChild(tagTitle);
   tagSection.appendChild(tagRow);
 
-  const notesSection = document.createElement('div');
-  const notesTitle = document.createElement('div');
-  notesTitle.className = 'np-section-title';
-  notesTitle.textContent = '文档';
-  const noteList = document.createElement('div');
-  noteList.className = 'np-list';
-  notesSection.appendChild(notesTitle);
-  notesSection.appendChild(noteList);
-
-  leftBody.appendChild(createSection);
   leftBody.appendChild(searchInput);
-  leftBody.appendChild(folderSection);
   leftBody.appendChild(tagSection);
-  leftBody.appendChild(notesSection);
+  leftBody.appendChild(folderSection);
 
   leftCard.appendChild(leftHeader);
   leftCard.appendChild(leftBody);
@@ -259,13 +236,10 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
     btnSave,
     btnDelete,
     statusPill,
-    newFolderInput,
-    newNoteTitleInput,
     createHint,
     searchInput,
     folderList,
     tagRow,
-    noteList,
     titleInput,
     folderSelect,
     tagsInput,

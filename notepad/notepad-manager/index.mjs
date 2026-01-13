@@ -4,6 +4,7 @@ import { normalizeString, setButtonEnabled } from './dom.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { parseTags, tagsToText } from './tags.mjs';
 import { createNotepadManagerUi } from './ui.mjs';
+import { createDsPathTreeView } from './ds-tree.mjs';
 
 export function mount({ container, host, slots }) {
   if (!container) throw new Error('container is required');
@@ -20,13 +21,10 @@ export function mount({ container, host, slots }) {
     btnNewNote,
     btnSave,
     btnDelete,
-    newFolderInput,
-    newNoteTitleInput,
     createHint,
     searchInput,
     folderList,
     tagRow,
-    noteList,
     titleInput,
     folderSelect,
     tagsInput,
@@ -52,6 +50,31 @@ export function mount({ container, host, slots }) {
   let currentContent = '';
   let dirty = false;
   let controlsEnabled = false;
+  let activeTreeKey = '';
+  const NOTE_KEY_PREFIX = '__note__:';
+  const noteIndex = new Map();
+
+  const makeNoteKey = (folder, id) => {
+    const noteId = normalizeString(id);
+    const folderPath = normalizeString(folder);
+    if (!noteId) return folderPath || '';
+    const segment = `${NOTE_KEY_PREFIX}${noteId}`;
+    return folderPath ? `${folderPath}/${segment}` : segment;
+  };
+
+  const parseTreeKey = (key) => {
+    const raw = typeof key === 'string' ? key.trim() : '';
+    if (!raw) return { kind: 'folder', folder: '' };
+    const parts = raw.split('/').filter(Boolean);
+    if (parts.length === 0) return { kind: 'folder', folder: '' };
+    const last = parts[parts.length - 1] || '';
+    if (last.startsWith(NOTE_KEY_PREFIX)) {
+      const noteId = last.slice(NOTE_KEY_PREFIX.length);
+      const folder = parts.slice(0, -1).join('/');
+      return { kind: 'note', folder, noteId };
+    }
+    return { kind: 'folder', folder: parts.join('/') };
+  };
 
   const setControlsEnabled = (enabled) => {
     controlsEnabled = enabled;
@@ -59,8 +82,6 @@ export function mount({ container, host, slots }) {
     setButtonEnabled(btnNewNote, enabled);
     setButtonEnabled(btnSave, enabled && Boolean(currentNote));
     setButtonEnabled(btnDelete, enabled && Boolean(currentNote));
-    newFolderInput.disabled = !enabled;
-    newNoteTitleInput.disabled = !enabled;
     searchInput.disabled = !enabled;
     titleInput.disabled = !enabled;
     folderSelect.disabled = !enabled;
@@ -73,16 +94,370 @@ export function mount({ container, host, slots }) {
     createHint.textContent = `新笔记将创建在：${label}`;
   };
 
+  const showFolderMenu = (x, y, f) => {
+    showMenu(x, y, [
+      {
+        label: '设为当前文件夹',
+        onClick: async () => {
+          selectedFolder = f;
+          activeTreeKey = f;
+          updateCreateHint();
+          renderFolderList();
+        },
+      },
+      {
+        label: '在此新建笔记…',
+        onClick: async () => {
+          if (!(await ensureSafeToSwitch())) return;
+          const values = await showDialog({
+            title: '新建笔记',
+            description: `目标文件夹：${f ? f : '根目录'}`,
+            fields: [{ name: 'title', label: '标题', kind: 'text', value: '', placeholder: '可空' }],
+            confirmText: '创建',
+          });
+          if (!values) return;
+          const noteTitle = normalizeString(values.title);
+          setStatus('Notes: creating note...', 'bad');
+          const res = await api.createNote({ folder: f, title: noteTitle });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'create note failed'}`, 'bad');
+            return;
+          }
+          selectedFolder = f;
+          updateCreateHint();
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          const id = res?.note?.id || '';
+          if (id) await openNote(id);
+          setStatus('Notes: note created', 'ok');
+        },
+      },
+      {
+        label: '新建子文件夹…',
+        onClick: async () => {
+          if (!(await ensureSafeToSwitch())) return;
+          const values = await showDialog({
+            title: '新建文件夹',
+            fields: [
+              {
+                name: 'folder',
+                label: '文件夹路径',
+                kind: 'text',
+                value: f ? `${f}/` : '',
+                placeholder: '例如：work/ideas',
+                required: true,
+              },
+            ],
+            confirmText: '创建',
+          });
+          if (!values) return;
+          const folder = normalizeString(values.folder);
+          if (!folder) return;
+          setStatus('Notes: creating folder...', 'bad');
+          const res = await api.createFolder({ folder });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'create folder failed'}`, 'bad');
+            return;
+          }
+          selectedFolder = res?.folder || folder;
+          updateCreateHint();
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          setStatus('Notes: folder created', 'ok');
+        },
+      },
+      {
+        label: '重命名文件夹…',
+        disabled: !f,
+        onClick: async () => {
+          if (!(await ensureSafeToSwitch())) return;
+          const values = await showDialog({
+            title: '重命名文件夹',
+            description: `当前：${f}`,
+            fields: [{ name: 'to', label: '新路径', kind: 'text', value: f, placeholder: '例如：work/notes', required: true }],
+            confirmText: '重命名',
+          });
+          if (!values) return;
+          const to = normalizeString(values.to);
+          if (!to) return;
+          setStatus('Notes: renaming folder...', 'bad');
+          const res = await api.renameFolder({ from: f, to });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'rename failed'}`, 'bad');
+            return;
+          }
+          if (selectedFolder === f) {
+            selectedFolder = to;
+          } else if (selectedFolder.startsWith(`${f}/`)) {
+            selectedFolder = `${to}/${selectedFolder.slice(f.length + 1)}`;
+          }
+          if (currentNote?.folder === f) {
+            currentNote.folder = to;
+          } else if (currentNote?.folder && String(currentNote.folder).startsWith(`${f}/`)) {
+            currentNote.folder = `${to}/${String(currentNote.folder).slice(f.length + 1)}`;
+          }
+          updateCreateHint();
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          renderEditor(true);
+          setStatus('Notes: folder renamed', 'ok');
+        },
+      },
+      {
+        label: '删除文件夹（递归）',
+        disabled: !f,
+        danger: true,
+        onClick: async () => {
+          if (!(await ensureSafeToSwitch())) return;
+          const ok = await confirmDialog(`确定删除文件夹「${f}」及其所有子目录与笔记吗？`, {
+            title: '删除文件夹',
+            danger: true,
+            confirmText: '删除',
+          });
+          if (!ok) return;
+          setStatus('Notes: deleting folder...', 'bad');
+          const res = await api.deleteFolder({ folder: f, recursive: true });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'delete folder failed'}`, 'bad');
+            return;
+          }
+          if (selectedFolder === f || selectedFolder.startsWith(`${f}/`)) {
+            selectedFolder = '';
+          }
+          updateCreateHint();
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          renderEditor(true);
+          setStatus('Notes: folder deleted', 'ok');
+        },
+      },
+    ]);
+  };
+
+  const showNoteMenu = (x, y, n) => {
+    const noteId = normalizeString(n?.id);
+    if (!noteId) return;
+    showMenu(x, y, [
+      {
+        label: noteId === selectedNoteId ? '当前已打开' : '打开',
+        disabled: noteId === selectedNoteId,
+        onClick: async () => {
+          if (noteId === selectedNoteId) return;
+          if (!(await ensureSafeToSwitch())) return;
+          await openNote(noteId);
+        },
+      },
+      {
+        label: '重命名…',
+        onClick: async () => {
+          const values = await showDialog({
+            title: '重命名笔记',
+            description: `ID: ${noteId}`,
+            fields: [{ name: 'title', label: '标题', kind: 'text', value: n?.title || '', placeholder: '例如：周报', required: true }],
+            confirmText: '重命名',
+          });
+          if (!values) return;
+          const nextTitle = normalizeString(values.title);
+          if (!nextTitle) return;
+          if (noteId === selectedNoteId && currentNote) {
+            currentNote.title = nextTitle;
+            try {
+              titleInput.value = nextTitle;
+            } catch {
+              // ignore
+            }
+            dirty = true;
+            renderEditor(false);
+            await doSave();
+            return;
+          }
+          setStatus('Notes: updating note...', 'bad');
+          const res = await api.updateNote({ id: noteId, title: nextTitle });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'update failed'}`, 'bad');
+            return;
+          }
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          setStatus('Notes: note updated', 'ok');
+        },
+      },
+      {
+        label: '移动到文件夹…',
+        onClick: async () => {
+          const options = (Array.isArray(folders) ? folders : ['']).map((f) => ({ value: f, label: f ? f : '（根目录）' }));
+          const values = await showDialog({
+            title: '移动笔记',
+            description: `当前：${n?.folder ? n.folder : '根目录'}`,
+            fields: [{ name: 'folder', label: '目标文件夹', kind: 'select', options, value: n?.folder || '' }],
+            confirmText: '移动',
+          });
+          if (!values) return;
+          const nextFolder = normalizeString(values.folder);
+          if (noteId === selectedNoteId && currentNote) {
+            currentNote.folder = nextFolder;
+            try {
+              folderSelect.value = nextFolder;
+            } catch {
+              // ignore
+            }
+            dirty = true;
+            renderEditor(false);
+            await doSave();
+            return;
+          }
+          setStatus('Notes: moving note...', 'bad');
+          const res = await api.updateNote({ id: noteId, folder: nextFolder });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'move failed'}`, 'bad');
+            return;
+          }
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          setStatus('Notes: note moved', 'ok');
+        },
+      },
+      {
+        label: '设置标签…',
+        onClick: async () => {
+          const values = await showDialog({
+            title: '设置标签',
+            description: '用逗号分隔，例如：work, todo',
+            fields: [{ name: 'tags', label: '标签', kind: 'text', value: tagsToText(n?.tags), placeholder: 'tag1, tag2' }],
+            confirmText: '应用',
+          });
+          if (!values) return;
+          const nextTags = parseTags(values.tags);
+          if (noteId === selectedNoteId && currentNote) {
+            currentNote.tags = nextTags;
+            try {
+              tagsInput.value = tagsToText(nextTags);
+            } catch {
+              // ignore
+            }
+            dirty = true;
+            renderEditor(false);
+            await doSave();
+            return;
+          }
+          setStatus('Notes: updating tags...', 'bad');
+          const res = await api.updateNote({ id: noteId, tags: nextTags });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'update failed'}`, 'bad');
+            return;
+          }
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          setStatus('Notes: tags updated', 'ok');
+        },
+      },
+      {
+        label: '删除',
+        danger: true,
+        onClick: async () => {
+          if (noteId === selectedNoteId && currentNote) {
+            await doDelete();
+            return;
+          }
+          const ok = await confirmDialog(`确定删除「${n?.title || 'Untitled'}」吗？`, {
+            title: '删除笔记',
+            danger: true,
+            confirmText: '删除',
+          });
+          if (!ok) return;
+          setStatus('Notes: deleting note...', 'bad');
+          const res = await api.deleteNote({ id: noteId });
+          if (!res?.ok) {
+            setStatus(`Notes: ${res?.message || 'delete failed'}`, 'bad');
+            return;
+          }
+          await refreshFoldersAndTags();
+          await refreshNotes();
+          setStatus('Notes: note deleted', 'ok');
+        },
+      },
+    ]);
+  };
+
+  const showTreeMenu = (x, y, key) => {
+    const parsed = parseTreeKey(key);
+    if (parsed.kind === 'note') {
+      const note = noteIndex.get(parsed.noteId);
+      if (note) showNoteMenu(x, y, note);
+      return;
+    }
+    showFolderMenu(x, y, parsed.folder);
+  };
+
+  const folderTree = createDsPathTreeView({
+    container: folderList,
+    getLabel: (key) => {
+      const parsed = parseTreeKey(key);
+      if (parsed.kind === 'note') {
+        const note = noteIndex.get(parsed.noteId);
+        return note?.title || 'Untitled';
+      }
+      return parsed.folder ? parsed.folder.split('/').slice(-1)[0] : '（根目录）';
+    },
+    getTitle: (key) => {
+      const parsed = parseTreeKey(key);
+      if (parsed.kind === 'note') {
+        const note = noteIndex.get(parsed.noteId);
+        const folderText = parsed.folder ? parsed.folder : '根目录';
+        const updatedAt = note?.updatedAt ? ` · ${note.updatedAt}` : '';
+        return `${note?.title || 'Untitled'} · ${folderText}${updatedAt}`;
+      }
+      return parsed.folder ? parsed.folder : '全部笔记的根目录';
+    },
+    getIconClass: (key) => {
+      const parsed = parseTreeKey(key);
+      if (parsed.kind === 'note') return 'ds-tree-icon-note';
+      return parsed.folder ? 'ds-tree-icon-folder' : 'ds-tree-icon-home';
+    },
+    getSortMeta: (key) => {
+      if (!key) return { group: -1, label: '' };
+      const parsed = parseTreeKey(key);
+      if (parsed.kind === 'note') {
+        const note = noteIndex.get(parsed.noteId);
+        return { group: 1, label: note?.title || 'Untitled' };
+      }
+      return { group: 0, label: parsed.folder.split('/').slice(-1)[0] };
+    },
+    onSelect: async (key) => {
+      if (disposed) return;
+      const parsed = parseTreeKey(key);
+      if (parsed.kind === 'note') {
+        const noteId = parsed.noteId;
+        if (!noteId || noteId === selectedNoteId) return;
+        activeTreeKey = key;
+        if (!(await ensureSafeToSwitch())) return;
+        if (selectedFolder !== parsed.folder) {
+          selectedFolder = parsed.folder;
+          updateCreateHint();
+        }
+        await openNote(noteId);
+        return;
+      }
+      const folder = parsed.folder;
+      if (folder === selectedFolder) return;
+      activeTreeKey = folder;
+      selectedFolder = folder;
+      updateCreateHint();
+      renderFolderList();
+    },
+    onContextMenu: (ev, key) => {
+      if (disposed) return;
+      showTreeMenu(ev?.clientX ?? 0, ev?.clientY ?? 0, key);
+    },
+  });
+
   const ensureSafeToSwitch = async () => {
     if (!dirty) return true;
-    const ok = await confirmDialog('当前笔记有未保存的修改，确定丢弃并继续吗？', {
+    return await confirmDialog('当前笔记有未保存的修改，确定丢弃并继续吗？', {
       title: '未保存的更改',
       danger: true,
       confirmText: '丢弃并继续',
     });
-    if (!ok) return false;
-    dirty = false;
-    return true;
   };
 
   const renderFolderOptions = () => {
@@ -97,180 +472,26 @@ export function mount({ container, host, slots }) {
   };
 
   const renderFolderList = () => {
-    folderList.innerHTML = '';
-    for (const f of folders) {
-      const item = document.createElement('div');
-      item.className = 'np-item';
-      item.dataset.active = f === selectedFolder ? '1' : '0';
-      const depth = f ? f.split('/').length - 1 : 0;
-      item.style.paddingLeft = `${10 + depth * 12}px`;
-      const name = f ? f.split('/').slice(-1)[0] : '（根目录）';
-      const titleEl = document.createElement('div');
-      titleEl.className = 'np-item-title';
-      titleEl.textContent = name;
-      const metaEl = document.createElement('div');
-      metaEl.className = 'np-item-meta';
-      metaEl.textContent = f ? f : '全部笔记的根目录';
-      item.appendChild(titleEl);
-      item.appendChild(metaEl);
-      item.addEventListener('click', async () => {
-        if (disposed) return;
-        if (!(await ensureSafeToSwitch())) return;
-        selectedFolder = f;
-        updateCreateHint();
-        await refreshNotes();
-        renderFolderList();
-      });
-      item.addEventListener('contextmenu', (ev) => {
-        if (disposed) return;
-        try {
-          ev.preventDefault();
-          ev.stopPropagation();
-        } catch {
-          // ignore
-        }
+    const paths = Array.isArray(folders) ? [...folders] : [];
+    (Array.isArray(notes) ? notes : []).forEach((n) => {
+      const id = normalizeString(n?.id);
+      if (!id) return;
+      paths.push(makeNoteKey(n?.folder, id));
+    });
 
-        showMenu(ev.clientX, ev.clientY, [
-          {
-            label: '设为当前文件夹',
-            onClick: async () => {
-              if (!(await ensureSafeToSwitch())) return;
-              selectedFolder = f;
-              updateCreateHint();
-              await refreshNotes();
-              renderFolderList();
-            },
-          },
-          {
-            label: '在此新建笔记…',
-            onClick: async () => {
-              if (!(await ensureSafeToSwitch())) return;
-              const values = await showDialog({
-                title: '新建笔记',
-                description: `目标文件夹：${f ? f : '根目录'}`,
-                fields: [{ name: 'title', label: '标题', kind: 'text', value: '', placeholder: '可空' }],
-                confirmText: '创建',
-              });
-              if (!values) return;
-              const noteTitle = normalizeString(values.title);
-              setStatus('Notes: creating note...', 'bad');
-              const res = await api.createNote({ folder: f, title: noteTitle });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'create note failed'}`, 'bad');
-                return;
-              }
-              selectedFolder = f;
-              updateCreateHint();
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              const id = res?.note?.id || '';
-              if (id) await openNote(id);
-              setStatus('Notes: note created', 'ok');
-            },
-          },
-          {
-            label: '新建子文件夹…',
-            onClick: async () => {
-              if (!(await ensureSafeToSwitch())) return;
-              const values = await showDialog({
-                title: '新建文件夹',
-                fields: [
-                  {
-                    name: 'folder',
-                    label: '文件夹路径',
-                    kind: 'text',
-                    value: f ? `${f}/` : '',
-                    placeholder: '例如：work/ideas',
-                    required: true,
-                  },
-                ],
-                confirmText: '创建',
-              });
-              if (!values) return;
-              const folder = normalizeString(values.folder);
-              if (!folder) return;
-              setStatus('Notes: creating folder...', 'bad');
-              const res = await api.createFolder({ folder });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'create folder failed'}`, 'bad');
-                return;
-              }
-              selectedFolder = res?.folder || folder;
-              updateCreateHint();
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              setStatus('Notes: folder created', 'ok');
-            },
-          },
-          {
-            label: '重命名文件夹…',
-            disabled: !f,
-            onClick: async () => {
-              if (!(await ensureSafeToSwitch())) return;
-              const values = await showDialog({
-                title: '重命名文件夹',
-                description: `当前：${f}`,
-                fields: [{ name: 'to', label: '新路径', kind: 'text', value: f, placeholder: '例如：work/notes', required: true }],
-                confirmText: '重命名',
-              });
-              if (!values) return;
-              const to = normalizeString(values.to);
-              if (!to) return;
-              setStatus('Notes: renaming folder...', 'bad');
-              const res = await api.renameFolder({ from: f, to });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'rename failed'}`, 'bad');
-                return;
-              }
-              if (selectedFolder === f) {
-                selectedFolder = to;
-              } else if (selectedFolder.startsWith(`${f}/`)) {
-                selectedFolder = `${to}/${selectedFolder.slice(f.length + 1)}`;
-              }
-              if (currentNote?.folder === f) {
-                currentNote.folder = to;
-              } else if (currentNote?.folder && String(currentNote.folder).startsWith(`${f}/`)) {
-                currentNote.folder = `${to}/${String(currentNote.folder).slice(f.length + 1)}`;
-              }
-              updateCreateHint();
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              renderEditor(true);
-              setStatus('Notes: folder renamed', 'ok');
-            },
-          },
-          {
-            label: '删除文件夹（递归）',
-            disabled: !f,
-            danger: true,
-            onClick: async () => {
-              if (!(await ensureSafeToSwitch())) return;
-              const ok = await confirmDialog(`确定删除文件夹「${f}」及其所有子目录与笔记吗？`, {
-                title: '删除文件夹',
-                danger: true,
-                confirmText: '删除',
-              });
-              if (!ok) return;
-              setStatus('Notes: deleting folder...', 'bad');
-              const res = await api.deleteFolder({ folder: f, recursive: true });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'delete folder failed'}`, 'bad');
-                return;
-              }
-              if (selectedFolder === f || selectedFolder.startsWith(`${f}/`)) {
-                selectedFolder = '';
-              }
-              updateCreateHint();
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              renderEditor(true);
-              setStatus('Notes: folder deleted', 'ok');
-            },
-          },
-        ]);
-      });
-      folderList.appendChild(item);
-    }
+    const fallbackKey = selectedNoteId
+      ? makeNoteKey(normalizeString(currentNote?.folder) || selectedFolder, selectedNoteId)
+      : selectedFolder;
+    const selectedKey = activeTreeKey || fallbackKey;
+
+    const parsed = parseTreeKey(selectedKey);
+    const folderToExpand = parsed.kind === 'note' ? parsed.folder : parsed.folder;
+    const expanded = new Set(folderTree.getExpandedKeys());
+    expanded.add('');
+    if (folderToExpand) expanded.add(folderToExpand);
+    folderTree.setExpandedKeys(Array.from(expanded));
+
+    folderTree.render({ paths, selectedKey });
   };
 
   const renderTags = () => {
@@ -297,199 +518,6 @@ export function mount({ container, host, slots }) {
         renderTags();
       });
       tagRow.appendChild(chip);
-    }
-  };
-
-  const renderNotes = () => {
-    noteList.innerHTML = '';
-    if (!Array.isArray(notes) || notes.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'np-meta';
-      empty.textContent = '暂无文档';
-      noteList.appendChild(empty);
-      return;
-    }
-    for (const n of notes) {
-      const item = document.createElement('div');
-      item.className = 'np-item';
-      item.dataset.active = n.id === selectedNoteId ? '1' : '0';
-
-      const titleEl = document.createElement('div');
-      titleEl.className = 'np-item-title';
-      titleEl.textContent = n.title || 'Untitled';
-
-      const metaEl = document.createElement('div');
-      metaEl.className = 'np-item-meta';
-      const folderText = n.folder ? n.folder : '（根目录）';
-      const tagText = Array.isArray(n.tags) && n.tags.length > 0 ? ` · ${n.tags.join(', ')}` : '';
-      metaEl.textContent = `${folderText}${tagText}`;
-
-      item.appendChild(titleEl);
-      item.appendChild(metaEl);
-
-      item.addEventListener('click', async () => {
-        if (disposed) return;
-        if (n.id === selectedNoteId) return;
-        if (!(await ensureSafeToSwitch())) return;
-        await openNote(n.id);
-      });
-
-      item.addEventListener('contextmenu', (ev) => {
-        if (disposed) return;
-        try {
-          ev.preventDefault();
-          ev.stopPropagation();
-        } catch {
-          // ignore
-        }
-
-        showMenu(ev.clientX, ev.clientY, [
-          {
-            label: n.id === selectedNoteId ? '当前已打开' : '打开',
-            disabled: n.id === selectedNoteId,
-            onClick: async () => {
-              if (n.id === selectedNoteId) return;
-              if (!(await ensureSafeToSwitch())) return;
-              await openNote(n.id);
-            },
-          },
-          {
-            label: '重命名…',
-            onClick: async () => {
-              const values = await showDialog({
-                title: '重命名笔记',
-                description: `ID: ${n.id}`,
-                fields: [
-                  { name: 'title', label: '标题', kind: 'text', value: n.title || '', placeholder: '例如：周报', required: true },
-                ],
-                confirmText: '重命名',
-              });
-              if (!values) return;
-              const nextTitle = normalizeString(values.title);
-              if (!nextTitle) return;
-              if (n.id === selectedNoteId && currentNote) {
-                currentNote.title = nextTitle;
-                try {
-                  titleInput.value = nextTitle;
-                } catch {
-                  // ignore
-                }
-                dirty = true;
-                renderEditor(false);
-                await doSave();
-                return;
-              }
-              setStatus('Notes: updating note...', 'bad');
-              const res = await api.updateNote({ id: n.id, title: nextTitle });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'update failed'}`, 'bad');
-                return;
-              }
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              setStatus('Notes: note updated', 'ok');
-            },
-          },
-          {
-            label: '移动到文件夹…',
-            onClick: async () => {
-              const options = (Array.isArray(folders) ? folders : ['']).map((f) => ({ value: f, label: f ? f : '（根目录）' }));
-              const values = await showDialog({
-                title: '移动笔记',
-                description: `当前：${n.folder ? n.folder : '根目录'}`,
-                fields: [{ name: 'folder', label: '目标文件夹', kind: 'select', options, value: n.folder || '' }],
-                confirmText: '移动',
-              });
-              if (!values) return;
-              const nextFolder = normalizeString(values.folder);
-              if (n.id === selectedNoteId && currentNote) {
-                currentNote.folder = nextFolder;
-                try {
-                  folderSelect.value = nextFolder;
-                } catch {
-                  // ignore
-                }
-                dirty = true;
-                renderEditor(false);
-                await doSave();
-                return;
-              }
-              setStatus('Notes: moving note...', 'bad');
-              const res = await api.updateNote({ id: n.id, folder: nextFolder });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'move failed'}`, 'bad');
-                return;
-              }
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              setStatus('Notes: note moved', 'ok');
-            },
-          },
-          {
-            label: '设置标签…',
-            onClick: async () => {
-              const values = await showDialog({
-                title: '设置标签',
-                description: '用逗号分隔，例如：work, todo',
-                fields: [
-                  { name: 'tags', label: '标签', kind: 'text', value: tagsToText(n.tags), placeholder: 'tag1, tag2' },
-                ],
-                confirmText: '应用',
-              });
-              if (!values) return;
-              const nextTags = parseTags(values.tags);
-              if (n.id === selectedNoteId && currentNote) {
-                currentNote.tags = nextTags;
-                try {
-                  tagsInput.value = tagsToText(nextTags);
-                } catch {
-                  // ignore
-                }
-                dirty = true;
-                renderEditor(false);
-                await doSave();
-                return;
-              }
-              setStatus('Notes: updating tags...', 'bad');
-              const res = await api.updateNote({ id: n.id, tags: nextTags });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'update failed'}`, 'bad');
-                return;
-              }
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              setStatus('Notes: tags updated', 'ok');
-            },
-          },
-          {
-            label: '删除',
-            danger: true,
-            onClick: async () => {
-              if (n.id === selectedNoteId && currentNote) {
-                await doDelete();
-                return;
-              }
-              const ok = await confirmDialog(`确定删除「${n.title || 'Untitled'}」吗？`, {
-                title: '删除笔记',
-                danger: true,
-                confirmText: '删除',
-              });
-              if (!ok) return;
-              setStatus('Notes: deleting note...', 'bad');
-              const res = await api.deleteNote({ id: n.id });
-              if (!res?.ok) {
-                setStatus(`Notes: ${res?.message || 'delete failed'}`, 'bad');
-                return;
-              }
-              await refreshFoldersAndTags();
-              await refreshNotes();
-              setStatus('Notes: note deleted', 'ok');
-            },
-          },
-        ]);
-      });
-
-      noteList.appendChild(item);
     }
   };
 
@@ -527,13 +555,20 @@ export function mount({ container, host, slots }) {
   const refreshNotes = async () => {
     const query = normalizeString(searchInput.value);
     const res = await api.listNotes({
-      folder: selectedFolder,
+      folder: '',
+      recursive: true,
       tags: selectedTags,
       match: 'all',
       query,
-      limit: 200,
+      limit: 500,
     });
     notes = Array.isArray(res?.notes) ? res.notes : [];
+    noteIndex.clear();
+    notes.forEach((n) => {
+      const id = normalizeString(n?.id);
+      if (!id) return;
+      noteIndex.set(id, n);
+    });
     if (selectedNoteId && !notes.some((n) => n.id === selectedNoteId)) {
       selectedNoteId = '';
       currentNote = null;
@@ -541,7 +576,7 @@ export function mount({ container, host, slots }) {
       dirty = false;
       renderEditor(true);
     }
-    renderNotes();
+    renderFolderList();
   };
 
   const openNote = async (id) => {
@@ -560,7 +595,8 @@ export function mount({ container, host, slots }) {
     currentNote = res.note || null;
     currentContent = String(res.content ?? '');
     dirty = false;
-    renderNotes();
+    activeTreeKey = makeNoteKey(res.note?.folder, id);
+    renderFolderList();
     renderEditor(true);
   };
 
@@ -619,16 +655,23 @@ export function mount({ container, host, slots }) {
 
   btnNewFolder.addEventListener('click', async () => {
     if (disposed) return;
-    const folder = normalizeString(newFolderInput.value);
-    if (!folder) {
-      setStatus('Notes: folder is required', 'bad');
-      try {
-        newFolderInput.focus();
-      } catch {
-        // ignore
-      }
-      return;
-    }
+    const values = await showDialog({
+      title: '新建文件夹',
+      fields: [
+        {
+          name: 'folder',
+          label: '文件夹路径',
+          kind: 'text',
+          value: selectedFolder ? `${selectedFolder}/` : '',
+          placeholder: '例如：work/ideas',
+          required: true,
+        },
+      ],
+      confirmText: '创建',
+    });
+    if (!values) return;
+    const folder = normalizeString(values.folder);
+    if (!folder) return;
     setStatus('Notes: creating folder...', 'bad');
     let res = null;
     try {
@@ -641,7 +684,6 @@ export function mount({ container, host, slots }) {
       setStatus(`Notes: ${res?.message || 'create folder failed'}`, 'bad');
       return;
     }
-    newFolderInput.value = '';
     const created = normalizeString(res?.folder) || folder;
     if (created && !dirty) {
       selectedFolder = created;
@@ -657,7 +699,14 @@ export function mount({ container, host, slots }) {
   btnNewNote.addEventListener('click', async () => {
     if (disposed) return;
     if (!(await ensureSafeToSwitch())) return;
-    const title = normalizeString(newNoteTitleInput.value);
+    const values = await showDialog({
+      title: '新建笔记',
+      description: `目标文件夹：${selectedFolder ? selectedFolder : '根目录'}`,
+      fields: [{ name: 'title', label: '标题', kind: 'text', value: '', placeholder: '可空' }],
+      confirmText: '创建',
+    });
+    if (!values) return;
+    const title = normalizeString(values.title);
     setStatus('Notes: creating note...', 'bad');
     let res = null;
     try {
@@ -670,7 +719,6 @@ export function mount({ container, host, slots }) {
       setStatus(`Notes: ${res?.message || 'create note failed'}`, 'bad');
       return;
     }
-    newNoteTitleInput.value = '';
     await refreshFoldersAndTags();
     await refreshNotes();
     const id = res?.note?.id || '';
@@ -712,26 +760,6 @@ export function mount({ container, host, slots }) {
     dirty = true;
     currentContent = String(textarea.value ?? '');
     renderEditor(false);
-  });
-
-  newFolderInput.addEventListener('keydown', (ev) => {
-    if (ev?.key !== 'Enter') return;
-    try {
-      ev.preventDefault();
-    } catch {
-      // ignore
-    }
-    btnNewFolder.click();
-  });
-
-  newNoteTitleInput.addEventListener('keydown', (ev) => {
-    if (ev?.key !== 'Enter') return;
-    try {
-      ev.preventDefault();
-    } catch {
-      // ignore
-    }
-    btnNewNote.click();
   });
 
   const bootstrap = async () => {

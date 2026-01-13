@@ -1,11 +1,14 @@
+import { DS_TREE_STYLES } from './ds-tree.mjs';
+
 export const NOTEPAD_MANAGER_STYLES = `
+${DS_TREE_STYLES}
     .np-root {
       height: 100%;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 14px;
+      gap: 10px;
+      padding: 12px;
       box-sizing: border-box;
     }
     .np-header {
@@ -35,13 +38,20 @@ export const NOTEPAD_MANAGER_STYLES = `
     .np-pill[data-tone='bad'] { box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.12); }
     .np-btn {
       border: 1px solid var(--ds-panel-border);
-      background: var(--ds-subtle-bg);
-      border-radius: 12px;
-      padding: 8px 10px;
+      background: transparent;
+      border-radius: 10px;
+      padding: 6px 8px;
       cursor: pointer;
-      font-weight: 650;
+      font-weight: 600;
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: nowrap;
     }
-    .np-btn:hover { box-shadow: 0 0 0 3px var(--ds-focus-ring); }
+    .np-btn:hover { background: var(--ds-subtle-bg); }
+    .np-btn:focus-visible {
+      outline: 2px solid var(--ds-focus-ring, rgba(0, 212, 255, 0.32));
+      outline-offset: 1px;
+    }
     .np-btn:disabled,
     .np-btn[data-disabled='1'] {
       opacity: 0.55;
@@ -52,8 +62,8 @@ export const NOTEPAD_MANAGER_STYLES = `
       border: 1px solid var(--ds-panel-border);
       background: var(--ds-subtle-bg);
       color: inherit;
-      border-radius: 12px;
-      padding: 8px 10px;
+      border-radius: 10px;
+      padding: 7px 9px;
       outline: none;
       box-sizing: border-box;
     }
@@ -73,42 +83,67 @@ export const NOTEPAD_MANAGER_STYLES = `
       flex: 1;
       min-height: 0;
       display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 12px;
+      grid-template-columns: 300px 1fr;
+      gap: 10px;
     }
     .np-card {
       border: 1px solid var(--ds-panel-border);
       background: var(--ds-panel-bg);
-      border-radius: 14px;
+      border-radius: 12px;
       overflow: hidden;
       min-height: 0;
       display: flex;
       flex-direction: column;
     }
     .np-card-header {
-      padding: 10px 12px;
+      padding: 8px 10px;
       border-bottom: 1px solid var(--ds-panel-border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 650;
     }
     .np-card-body {
-      padding: 12px;
+      padding: 10px;
       flex: 1;
       min-height: 0;
       overflow: auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .np-section-title {
       font-size: 12px;
       font-weight: 750;
       opacity: 0.85;
       margin-bottom: 6px;
+    }
+    .np-section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .np-section-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .np-btn-icon {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .np-btn-icon .ds-tree-icon {
+      opacity: 0.86;
+    }
+    .np-create-hint {
+      margin-top: 6px;
     }
     .np-list {
       display: flex;
@@ -150,8 +185,16 @@ export const NOTEPAD_MANAGER_STYLES = `
     .np-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
+    }
+    .np-row-compact {
+      flex-wrap: nowrap;
+    }
+    .np-row-compact > .np-input {
+      width: auto;
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .np-editor-top {
       display: grid;
@@ -169,13 +212,13 @@ export const NOTEPAD_MANAGER_STYLES = `
       min-height: 0;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
     }
     .np-preview {
       border: 1px solid var(--ds-code-border);
       background: var(--ds-code-bg);
-      border-radius: 12px;
-      padding: 12px;
+      border-radius: 10px;
+      padding: 10px;
       overflow: auto;
       min-height: 0;
       font-size: 13px;
