@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const root = path.resolve(__dirname, '..');
+const sharedUiSrc = path.resolve(root, '..', 'common', 'aide-ui');
 const uiSrc = path.join(root, 'apps', 'ui');
 const entry = path.join(uiSrc, 'src', 'index.jsx');
 const dist = path.join(uiSrc, 'dist');
@@ -66,7 +67,9 @@ function buildIsFresh() {
     const mapFiles = ['bundle.js.map', 'bundle.css.map'].map((file) => path.join(dist, file));
     if (mapFiles.some((file) => fs.existsSync(file))) return false;
   }
-  const sources = listFilesRecursive(path.join(uiSrc, 'src')).concat([htmlSrc, iconSrc]);
+  const sources = listFilesRecursive(path.join(uiSrc, 'src'))
+    .concat(listFilesRecursive(sharedUiSrc))
+    .concat([htmlSrc, iconSrc]);
   const newestSource = getLatestMtimeMs(sources);
   if (!newestSource) return true;
 
@@ -106,6 +109,7 @@ async function main() {
     target: ['chrome120', 'node18'],
     loader: { '.js': 'jsx', '.jsx': 'jsx', '.css': 'css' },
     external: [],
+    nodePaths: [path.join(root, 'node_modules'), path.resolve(root, '..', 'deepseek_cli', 'node_modules')],
   });
   const html = fs.readFileSync(htmlSrc, 'utf8');
   fs.writeFileSync(htmlOut, html, 'utf8');
