@@ -1,1 +1,1 @@
-export { BaseService } from '../../../../common/state-core/base-service.js';
+export * from '../../../../common/admin-data/services/base-service.js';

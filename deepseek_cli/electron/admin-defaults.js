@@ -1,33 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
-import { resolveAidePath } from '../src/aide-paths.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
-const legacyModulePath = resolveAidePath({
-  projectRoot,
-  relativePath: 'shared/data/legacy.js',
-  purpose: 'electron admin defaults',
-});
-const legacy = await import(pathToFileURL(legacyModulePath).href);
-const sessionRootModulePath = resolveAidePath({
-  projectRoot,
-  relativePath: 'shared/session-root.js',
-  purpose: 'electron session root',
-});
-const sessionRootModule = await import(pathToFileURL(sessionRootModulePath).href);
-export const resolveSessionRoot = sessionRootModule.resolveSessionRoot;
-export const persistSessionRoot = sessionRootModule.persistSessionRoot;
-const {
+import {
   buildAdminSeed,
   extractVariables,
   loadBuiltinPromptFiles,
   parseMcpServers,
   parseModelsWithDefault,
   safeRead,
-} = legacy;
+} from '../../common/admin-data/legacy.js';
+
+export { resolveSessionRoot, persistSessionRoot } from '../src/session-root.js';
 
 export function createAdminDefaultsManager({ defaultPaths, adminDb, adminServices } = {}) {
   if (!defaultPaths) {

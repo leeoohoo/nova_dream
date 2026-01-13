@@ -6,6 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
+import { createDb } from '../../common/admin-data/storage.js';
+import { createAdminServices } from '../../common/admin-data/services/index.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,8 +23,6 @@ const importAide = async (relativePath) => {
   return await import(pathToFileURL(target).href);
 };
 
-const { createDb } = await importAide('shared/data/storage.js');
-const { createAdminServices } = await importAide('shared/data/services/index.js');
 const { createSessionApi } = await importAide('electron/session-api.js');
 
 const ROOT =

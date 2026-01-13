@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
+import { getDefaultTtyPaths } from '../../common/terminal/tty-paths.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,8 +41,6 @@ const importAideCompat = async (...relativePaths) => {
 
 const { getTerminalPlatform } = await importAideCompat('dist/terminal/platform/index.js', 'src/terminal/platform/index.js');
 const { getSystemTerminalLauncher } = await importAide('electron/terminal-manager/system-terminal/launcher.js');
-const { getDefaultTtyPaths } = await importAide('shared/terminal/tty-paths.js');
-
 function assertTerminalPlatform(platform, expected) {
   const impl = getTerminalPlatform(platform);
   assert.equal(typeof impl.ensureUtf8Console, 'function');

@@ -16,7 +16,7 @@ import { registerUiAppsApi } from './ui-apps/index.js';
 import { installUiAppsPlugins } from './ui-apps/plugin-installer.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 import { resolveSessionRoot, persistSessionRoot } from '../src/session-root.js';
-import { ensureAppStateDir } from '../common/state-core/state-paths.js';
+import { ensureAppStateDir } from '../../common/state-core/state-paths.js';
 import { installAideEngine, getAideInstallStatus, detectAideVersion } from './aide-installer.js';
 import { createLspInstaller } from './lsp-installer.js';
 
@@ -739,10 +739,10 @@ ipcMain.handle('lsp:install', async (_event, payload = {}) => {
 
   if (AIDE_INSTALLED) {
   const { createAdminDefaultsManager } = await import('./admin-defaults.js');
-  const { createDb } = await importAide('shared/data/storage.js');
-  const { createAdminServices } = await importAide('shared/data/services/index.js');
-  const { syncAdminToFiles } = await importAide('shared/data/sync.js');
-  const { buildAdminSeed, parseMcpServers, loadBuiltinPromptFiles } = await importAide('shared/data/legacy.js');
+  const { createDb } = await import('../../common/admin-data/storage.js');
+  const { createAdminServices } = await import('../../common/admin-data/services/index.js');
+  const { syncAdminToFiles } = await import('../../common/admin-data/sync.js');
+  const { buildAdminSeed, parseMcpServers, loadBuiltinPromptFiles } = await import('../../common/admin-data/legacy.js');
   const { createWorkspaceOps } = await importAide('electron/workspace.js');
   const {
     listSessions,
@@ -760,7 +760,7 @@ ipcMain.handle('lsp:install', async (_event, payload = {}) => {
   const { ChatSession } = await importAideCompat('src/session.js', 'dist/session.js');
   const { ModelClient } = await importAideCompat('src/client.js', 'dist/client.js');
   const { createAppConfigFromModels } = await importAideCompat('src/config.js', 'dist/config.js');
-  const { applySecretsToProcessEnv } = await importAide('shared/secrets-env.js');
+  const { applySecretsToProcessEnv } = await import('../../common/secrets-env.js');
 
   const defaultPaths = {
     defaultsRoot: cliRoot,

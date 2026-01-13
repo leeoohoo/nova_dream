@@ -35,6 +35,60 @@ function copyDir(srcDir, destDir) {
   });
 }
 
+function listFilesRecursive(dirPath) {
+  const results = [];
+  const root = typeof dirPath === 'string' ? dirPath.trim() : '';
+  if (!root) return results;
+  if (!isDirectory(root)) return results;
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+      } else if (entry.isFile()) {
+        results.push(fullPath);
+      }
+    }
+  }
+  return results;
+}
+
+function patchEmbeddedAideCommonImports(aideRoot) {
+  const root = typeof aideRoot === 'string' ? aideRoot.trim() : '';
+  if (!root) return;
+  const sharedRoot = path.join(root, 'shared');
+  if (!isDirectory(sharedRoot)) return;
+
+  const COMMON_IMPORT_RE = /(['"])((?:\.\.\/)+)common\//g;
+  const candidates = listFilesRecursive(sharedRoot).filter((filePath) =>
+    ['.js', '.mjs', '.cjs'].includes(path.extname(filePath).toLowerCase())
+  );
+
+  candidates.forEach((filePath) => {
+    let src = '';
+    try {
+      src = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      return;
+    }
+    const next = src.replace(COMMON_IMPORT_RE, (_match, quote, relPrefix) => `${quote}../${relPrefix}common/`);
+    if (next === src) return;
+    try {
+      fs.writeFileSync(filePath, next, 'utf8');
+    } catch {
+      // ignore write errors
+    }
+  });
+}
+
 function main() {
   if (!isDirectory(externalAideRoot)) {
     console.error(`[sync:aide] External aide directory not found: ${externalAideRoot}`);
@@ -55,6 +109,8 @@ function main() {
     const dest = path.join(internalAideRoot, name);
     copyDir(src, dest);
   });
+
+  patchEmbeddedAideCommonImports(internalAideRoot);
 
   console.log(`[sync:aide] Vendored aide into: ${internalAideRoot}`);
 }

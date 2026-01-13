@@ -270,4 +270,4 @@ Agent 保存的关键数据结构（节选）：
 - 插件扫描/同步 AI 贡献：`deepseek_cli/electron/ui-apps/index.js`
 - Host API（module）：`deepseek_cli/apps/ui/src/features/apps/AppsPluginView.jsx`
 - Chat Agent 绑定 UI Apps（派生 MCP/Prompt）：`aide/electron/chat/runner.js`
-- Admin 数据结构：`aide/shared/data/schema.js`
+- Admin 数据结构：`common/admin-data/schema.js`（`aide/shared/data/schema.js` 为兼容 re-export）
