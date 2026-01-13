@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const root = path.resolve(__dirname, '..');
+const sharedUiSrc = path.resolve(root, '..', 'common', 'aide-ui');
 const uiSrc = path.join(root, 'apps', 'ui');
 const entry = path.join(uiSrc, 'src', 'index.jsx');
 const dist = path.join(uiSrc, 'dist');
@@ -67,6 +68,7 @@ function buildIsFresh() {
     if (mapFiles.some((file) => fs.existsSync(file))) return false;
   }
   const sources = listFilesRecursive(path.join(uiSrc, 'src')).concat([htmlSrc, iconSrc]);
+  sources.push(...listFilesRecursive(sharedUiSrc));
   const newestSource = getLatestMtimeMs(sources);
   if (!newestSource) return true;
 
@@ -106,6 +108,7 @@ async function main() {
     target: ['chrome120', 'node18'],
     loader: { '.js': 'jsx', '.jsx': 'jsx', '.css': 'css' },
     external: [],
+    nodePaths: [path.join(root, 'node_modules'), path.resolve(root, '..', 'aide', 'node_modules')],
   });
   const html = fs.readFileSync(htmlSrc, 'utf8');
   fs.writeFileSync(htmlOut, html, 'utf8');
