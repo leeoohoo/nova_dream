@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { clampNumber, parseArgs } from './cli-utils.js';
 import { createTtyPrompt } from './tty-prompt.js';
 import { resolveAppStateDir } from '../shared/state-paths.js';
 
@@ -763,42 +764,6 @@ function resolveSessionRoot() {
   const home = os.homedir();
   if (home) return path.resolve(home);
   return process.cwd();
-}
-
-function clampNumber(value, min, max, fallback) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(Math.max(num, min), max);
-}
-
-function parseArgs(input) {
-  const result = { _: [] };
-  for (let i = 0; i < input.length; i += 1) {
-    const token = input[i];
-    if (!token.startsWith('-')) {
-      result._.push(token);
-      continue;
-    }
-    const isLong = token.startsWith('--');
-    if (isLong && token.includes('=')) {
-      const trimmed = token.replace(/^--+/, '');
-      const [key, value] = trimmed.split('=');
-      if (key) {
-        result[key] = value ?? true;
-      }
-      continue;
-    }
-    const key = token.replace(/^-+/, '');
-    if (!key) continue;
-    const next = input[i + 1];
-    if (!next || next.startsWith('-')) {
-      result[key] = true;
-      continue;
-    }
-    result[key] = next;
-    i += 1;
-  }
-  return result;
 }
 
 function printHelp() {
