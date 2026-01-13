@@ -43,6 +43,7 @@ export async function handleSlashCommand(input, context) {
               userPrompt: context.userPrompt,
               subagentUserPrompt: context.subagentUserPrompt,
               subagentMcpAllowPrefixes: context.subagentMcpAllowPrefixes,
+              eventLogger: context.eventLogger,
             },
             { toolHistory: context.toolHistory }
           );

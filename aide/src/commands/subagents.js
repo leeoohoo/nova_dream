@@ -3,9 +3,33 @@ import { ChatSession, generateSessionId } from '../session.js';
 import { createResponsePrinter } from '../printer.js';
 import { buildUserPromptMessages } from '../prompts.js';
 import { routeCommandWithModel, routeWithModel } from '../subagents/router.js';
-import { resolveSubagentInvocationModel } from '../subagents/model.js';
+import { describeModelError, resolveSubagentInvocationModel, shouldFallbackToCurrentModelOnError } from '../subagents/model.js';
 import { filterSubagentTools, withSubagentGuardrails } from '../subagents/tooling.js';
 import { listTools } from '../tools/index.js';
+
+function logSubagentModelFallback({ eventLogger, toolHistory, title, payload, text }) {
+  if (toolHistory && typeof toolHistory.add === 'function') {
+    try {
+      toolHistory.add(title || 'subagent_model_fallback', text || '');
+    } catch {
+      // ignore
+    }
+  }
+  if (eventLogger && typeof eventLogger.log === 'function') {
+    try {
+      eventLogger.log('subagent_model_fallback', payload || {});
+    } catch {
+      // ignore
+    }
+    if (text) {
+      try {
+        eventLogger.log('subagent_notice', { text, source: 'system', ...(payload || {}) });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
 
 async function handleSubagentsCommand(argsText, context) {
   const manager = context.subAgents;
@@ -210,6 +234,7 @@ async function handleSubagentsCommand(argsText, context) {
             userPrompt: context.userPrompt,
             subagentUserPrompt: context.subagentUserPrompt,
             subagentMcpAllowPrefixes: context.subagentMcpAllowPrefixes,
+            eventLogger: context.eventLogger,
           },
           { toolHistory: context.toolHistory }
         );
@@ -300,9 +325,13 @@ export async function executeSubAgentTask(agentRef, taskText, requestedSkills, c
   const systemPrompt = withSubagentGuardrails(withTaskTracking(promptResult.systemPrompt, internalPrompt));
   const usedSkills = promptResult.usedSkills || [];
   const extraConfig = promptResult.extra || {};
+  const configuredModel = typeof agentRef.agent.model === 'string' ? agentRef.agent.model.trim() : '';
+  const currentModel = typeof context.currentModel === 'string' ? context.currentModel.trim() : '';
+  const eventLogger =
+    context.eventLogger && typeof context.eventLogger.log === 'function' ? context.eventLogger : null;
   const targetModel = resolveSubagentInvocationModel({
-    configuredModel: agentRef.agent.model,
-    currentModel: context.currentModel,
+    configuredModel,
+    currentModel,
     client,
   });
   if (!targetModel) {
@@ -328,35 +357,100 @@ export async function executeSubAgentTask(agentRef, taskText, requestedSkills, c
   }
   const toolHistory = options.toolHistory || null;
   const signal = options.signal || context.signal;
+  if (configuredModel && currentModel && configuredModel !== targetModel && targetModel === currentModel) {
+    const notice = `子流程模型 "${configuredModel}" 不可用或未配置 Key，本轮使用主流程模型 "${currentModel}"。`;
+    console.log(colors.yellow(notice));
+    logSubagentModelFallback({
+      eventLogger,
+      toolHistory,
+      title: `[sub:${agentRef.agent.id}] model_fallback`,
+      text: notice,
+      payload: {
+        kind: 'agent',
+        agent: agentRef.agent.id,
+        plugin: agentRef.plugin.id,
+        fromModel: configuredModel,
+        toModel: currentModel,
+        reason: 'model_unavailable',
+      },
+    });
+  }
   const reasoningEnabled =
     extraConfig.reasoning !== undefined ? extraConfig.reasoning : agentRef.agent.reasoning;
-  const printer = createResponsePrinter(`[sub:${agentRef.agent.id}]`, true, {
-    registerToolResult: toolHistory ? (toolName, content) => toolHistory.add(toolName, content) : null,
-  });
-  let response = '';
-  try {
-    const allowMcpPrefixes = Array.isArray(context.subagentMcpAllowPrefixes)
-      ? context.subagentMcpAllowPrefixes
-      : null;
-    const requestedTools =
-      Array.isArray(options.toolsOverride) && options.toolsOverride.length > 0
-        ? options.toolsOverride
-        : listTools();
-    const toolsOverride = filterSubagentTools(requestedTools, { allowMcpPrefixes });
-    response = await client.chat(targetModel, subSession, {
-      stream: true,
-      onToken: printer.onToken,
-      onReasoning: printer.onReasoning,
-      onToolCall: printer.onToolCall,
-      onToolResult: printer.onToolResult,
-      reasoning: reasoningEnabled,
-      toolsOverride,
-      signal,
+  const allowMcpPrefixes = Array.isArray(context.subagentMcpAllowPrefixes)
+    ? context.subagentMcpAllowPrefixes
+    : null;
+  const requestedTools =
+    Array.isArray(options.toolsOverride) && options.toolsOverride.length > 0
+      ? options.toolsOverride
+      : listTools();
+  const toolsOverride = filterSubagentTools(requestedTools, { allowMcpPrefixes });
+  const runWithPrinter = async (modelName) => {
+    const printer = createResponsePrinter(`[sub:${agentRef.agent.id}]`, true, {
+      registerToolResult: toolHistory
+        ? (toolName, content) => toolHistory.add(toolName, content)
+        : null,
     });
-  } finally {
-    printer.onComplete(response);
+    try {
+      const response = await client.chat(modelName, subSession, {
+        stream: true,
+        onToken: printer.onToken,
+        onReasoning: printer.onReasoning,
+        onToolCall: printer.onToolCall,
+        onToolResult: printer.onToolResult,
+        reasoning: reasoningEnabled,
+        toolsOverride,
+        signal,
+      });
+      printer.onComplete(response);
+      return response;
+    } catch (err) {
+      printer.onAbort?.();
+      throw err;
+    }
+  };
+
+  try {
+    const response = await runWithPrinter(targetModel);
+    return { response, usedSkills, model: targetModel };
+  } catch (err) {
+    if (!currentModel || currentModel === targetModel || !shouldFallbackToCurrentModelOnError(err)) {
+      throw err;
+    }
+    const info = describeModelError(err);
+    const detail = [info.reason, info.status ? `HTTP ${info.status}` : null, info.message]
+      .filter(Boolean)
+      .join(' - ');
+    const notice = `子流程模型 "${targetModel}" 调用失败（${detail || info.name}），本轮回退到主流程模型 "${currentModel}"。`;
+    console.log(colors.yellow(notice));
+    logSubagentModelFallback({
+      eventLogger,
+      toolHistory,
+      title: `[sub:${agentRef.agent.id}] model_fallback`,
+      text: notice,
+      payload: {
+        kind: 'agent',
+        agent: agentRef.agent.id,
+        plugin: agentRef.plugin.id,
+        fromModel: targetModel,
+        toModel: currentModel,
+        reason: info.reason,
+        error: info,
+      },
+    });
+    try {
+      const response = await runWithPrinter(currentModel);
+      return { response, usedSkills, model: currentModel, modelFallback: { fromModel: targetModel, toModel: currentModel, error: info } };
+    } catch (fallbackErr) {
+      const fallbackInfo = describeModelError(fallbackErr);
+      const fallbackDetail = [fallbackInfo.reason, fallbackInfo.status ? `HTTP ${fallbackInfo.status}` : null, fallbackInfo.message]
+        .filter(Boolean)
+        .join(' - ');
+      throw new Error(
+        `Sub-agent 调用失败。模型 "${targetModel}" 错误：${detail || info.name}；回退模型 "${currentModel}" 错误：${fallbackDetail || fallbackInfo.name}`
+      );
+    }
   }
-  return { response, usedSkills, model: targetModel };
 }
 
 export async function executeSubAgentCommand(commandRef, argumentText, context, options = {}) {
@@ -375,9 +469,13 @@ export async function executeSubAgentCommand(commandRef, argumentText, context, 
   const internalPrompt = promptResult.internalPrompt || '';
   const systemPrompt = withSubagentGuardrails(withTaskTracking(promptResult.systemPrompt, internalPrompt));
   const extraConfig = promptResult.extra || {};
+  const configuredModel = typeof commandRef.command.model === 'string' ? commandRef.command.model.trim() : '';
+  const currentModel = typeof context.currentModel === 'string' ? context.currentModel.trim() : '';
+  const eventLogger =
+    context.eventLogger && typeof context.eventLogger.log === 'function' ? context.eventLogger : null;
   const targetModel = resolveSubagentInvocationModel({
-    configuredModel: commandRef.command.model,
-    currentModel: context.currentModel,
+    configuredModel,
+    currentModel,
     client,
   });
   if (!targetModel) {
@@ -402,35 +500,100 @@ export async function executeSubAgentCommand(commandRef, argumentText, context, 
   );
   const toolHistory = options.toolHistory || null;
   const signal = options.signal || context.signal;
+  if (configuredModel && currentModel && configuredModel !== targetModel && targetModel === currentModel) {
+    const notice = `子流程模型 "${configuredModel}" 不可用或未配置 Key，本轮使用主流程模型 "${currentModel}"。`;
+    console.log(colors.yellow(notice));
+    logSubagentModelFallback({
+      eventLogger,
+      toolHistory,
+      title: `[cmd:${commandRef.plugin.id}:${commandRef.command.id}] model_fallback`,
+      text: notice,
+      payload: {
+        kind: 'command',
+        plugin: commandRef.plugin.id,
+        command: commandRef.command.id,
+        fromModel: configuredModel,
+        toModel: currentModel,
+        reason: 'model_unavailable',
+      },
+    });
+  }
   const reasoningEnabled =
     extraConfig.reasoning !== undefined ? extraConfig.reasoning : commandRef.command.reasoning;
-  const printer = createResponsePrinter(`[cmd:${commandRef.command.id}]`, true, {
-    registerToolResult: toolHistory ? (toolName, content) => toolHistory.add(toolName, content) : null,
-  });
-  let response = '';
-  try {
-    const allowMcpPrefixes = Array.isArray(context.subagentMcpAllowPrefixes)
-      ? context.subagentMcpAllowPrefixes
-      : null;
-    const requestedTools =
-      Array.isArray(options.toolsOverride) && options.toolsOverride.length > 0
-        ? options.toolsOverride
-        : listTools();
-    const toolsOverride = filterSubagentTools(requestedTools, { allowMcpPrefixes });
-    response = await client.chat(targetModel, subSession, {
-      stream: true,
-      onToken: printer.onToken,
-      onReasoning: printer.onReasoning,
-      onToolCall: printer.onToolCall,
-      onToolResult: printer.onToolResult,
-      reasoning: reasoningEnabled,
-      toolsOverride,
-      signal,
+  const allowMcpPrefixes = Array.isArray(context.subagentMcpAllowPrefixes)
+    ? context.subagentMcpAllowPrefixes
+    : null;
+  const requestedTools =
+    Array.isArray(options.toolsOverride) && options.toolsOverride.length > 0
+      ? options.toolsOverride
+      : listTools();
+  const toolsOverride = filterSubagentTools(requestedTools, { allowMcpPrefixes });
+  const runWithPrinter = async (modelName) => {
+    const printer = createResponsePrinter(`[cmd:${commandRef.command.id}]`, true, {
+      registerToolResult: toolHistory
+        ? (toolName, content) => toolHistory.add(toolName, content)
+        : null,
     });
-  } finally {
-    printer.onComplete(response);
+    try {
+      const response = await client.chat(modelName, subSession, {
+        stream: true,
+        onToken: printer.onToken,
+        onReasoning: printer.onReasoning,
+        onToolCall: printer.onToolCall,
+        onToolResult: printer.onToolResult,
+        reasoning: reasoningEnabled,
+        toolsOverride,
+        signal,
+      });
+      printer.onComplete(response);
+      return response;
+    } catch (err) {
+      printer.onAbort?.();
+      throw err;
+    }
+  };
+
+  try {
+    const response = await runWithPrinter(targetModel);
+    return { response, model: targetModel };
+  } catch (err) {
+    if (!currentModel || currentModel === targetModel || !shouldFallbackToCurrentModelOnError(err)) {
+      throw err;
+    }
+    const info = describeModelError(err);
+    const detail = [info.reason, info.status ? `HTTP ${info.status}` : null, info.message]
+      .filter(Boolean)
+      .join(' - ');
+    const notice = `子流程模型 "${targetModel}" 调用失败（${detail || info.name}），本轮回退到主流程模型 "${currentModel}"。`;
+    console.log(colors.yellow(notice));
+    logSubagentModelFallback({
+      eventLogger,
+      toolHistory,
+      title: `[cmd:${commandRef.plugin.id}:${commandRef.command.id}] model_fallback`,
+      text: notice,
+      payload: {
+        kind: 'command',
+        plugin: commandRef.plugin.id,
+        command: commandRef.command.id,
+        fromModel: targetModel,
+        toModel: currentModel,
+        reason: info.reason,
+        error: info,
+      },
+    });
+    try {
+      const response = await runWithPrinter(currentModel);
+      return { response, model: currentModel, modelFallback: { fromModel: targetModel, toModel: currentModel, error: info } };
+    } catch (fallbackErr) {
+      const fallbackInfo = describeModelError(fallbackErr);
+      const fallbackDetail = [fallbackInfo.reason, fallbackInfo.status ? `HTTP ${fallbackInfo.status}` : null, fallbackInfo.message]
+        .filter(Boolean)
+        .join(' - ');
+      throw new Error(
+        `Command 调用失败。模型 "${targetModel}" 错误：${detail || info.name}；回退模型 "${currentModel}" 错误：${fallbackDetail || fallbackInfo.name}`
+      );
+    }
   }
-  return { response, model: targetModel };
 }
 
 export async function maybeHandleAutoSubagentRequest(rawInput, context) {
@@ -498,6 +661,7 @@ export async function maybeHandleAutoSubagentRequest(rawInput, context) {
           userPrompt: context.userPrompt,
           subagentUserPrompt: context.subagentUserPrompt,
           subagentMcpAllowPrefixes: context.subagentMcpAllowPrefixes,
+          eventLogger: context.eventLogger,
         },
         { toolHistory: context.toolHistory, reason: route.reason, signal }
       );
@@ -542,6 +706,7 @@ export async function maybeHandleAutoSubagentRequest(rawInput, context) {
           userPrompt: context.userPrompt,
           subagentUserPrompt: context.subagentUserPrompt,
           subagentMcpAllowPrefixes: context.subagentMcpAllowPrefixes,
+          eventLogger: context.eventLogger,
         },
         { toolHistory: context.toolHistory, reason: agentRoute.reason, signal }
       );

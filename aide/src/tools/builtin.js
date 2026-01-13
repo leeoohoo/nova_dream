@@ -6,7 +6,7 @@ import { registerTool, listTools } from './registry.js';
 import { ChatSession, generateSessionId } from '../session.js';
 import { getSubAgentContext } from '../subagents/runtime.js';
 import { selectAgent } from '../subagents/selector.js';
-import { resolveSubagentInvocationModel } from '../subagents/model.js';
+import { describeModelError, resolveSubagentInvocationModel, shouldFallbackToCurrentModelOnError } from '../subagents/model.js';
 import { filterSubagentTools, withSubagentGuardrails } from '../subagents/tooling.js';
 import { buildUserPromptMessages } from '../prompts.js';
 import { appendRunPid } from '../chat/terminal.js';
@@ -90,11 +90,17 @@ registerTool({
     } catch (err) {
       throw new Error(`Failed to build sub-agent prompt: ${err.message}`);
     }
-    const targetModel = resolveSubagentInvocationModel({
-      configuredModel: agentRef.agent.model,
-      currentModel: typeof context.getCurrentModel === 'function' ? context.getCurrentModel() : null,
+    const configuredModel = typeof agentRef.agent.model === 'string' ? agentRef.agent.model.trim() : '';
+    const currentModel =
+      typeof context.getCurrentModel === 'function' ? context.getCurrentModel() : null;
+    let activeModel = resolveSubagentInvocationModel({
+      configuredModel,
+      currentModel,
       client,
     });
+    const fallbackModel = typeof currentModel === 'string' ? currentModel.trim() : '';
+    const canFallbackToMain = Boolean(fallbackModel && activeModel && activeModel !== fallbackModel);
+    let usedFallbackModel = false;
     const subSessionId = generateSessionId(task || '');
     const guardedPrompt = withSubagentGuardrails(systemPrompt);
     const extraSystemPrompts = buildUserPromptMessages(
@@ -113,6 +119,23 @@ registerTool({
       } catch {
         // ignore
       }
+    }
+    if (configuredModel && fallbackModel && configuredModel !== activeModel && activeModel === fallbackModel) {
+      const notice = `子流程模型 "${configuredModel}" 不可用或未配置 Key，本轮使用主流程模型 "${fallbackModel}"。`;
+      try {
+        registerToolResult?.(`[sub:${agentRef.agent.id}] model_fallback`, notice);
+      } catch {
+        // ignore
+      }
+      eventLogger?.log?.('subagent_notice', {
+        agent: agentRef.agent.id,
+        text: notice,
+        source: 'system',
+        kind: 'agent',
+        fromModel: configuredModel,
+        toModel: fallbackModel,
+        reason: 'model_unavailable',
+      });
     }
     eventLogger?.log?.('subagent_start', { agent: agentRef.agent.id, task });
     const allowMcpPrefixes = Array.isArray(context.subagentMcpAllowPrefixes)
@@ -211,7 +234,7 @@ registerTool({
           // eslint-disable-next-line no-await-in-loop
           await chatWithRetry(
             client,
-            targetModel,
+            activeModel,
             subSession,
             {
               stream: true,
@@ -284,6 +307,32 @@ registerTool({
               continue;
             }
           }
+          if (!usedFallbackModel && canFallbackToMain && shouldFallbackToCurrentModelOnError(err)) {
+            const failedModel = activeModel;
+            const info = describeModelError(err);
+            const detail = [info.reason, info.status ? `HTTP ${info.status}` : null, info.message]
+              .filter(Boolean)
+              .join(' - ');
+            const notice = `子流程模型 "${failedModel}" 调用失败（${detail || info.name}），本轮回退到主流程模型 "${fallbackModel}"。`;
+            usedFallbackModel = true;
+            activeModel = fallbackModel;
+            try {
+              registerToolResult?.(`[sub:${agentRef.agent.id}] model_fallback`, notice);
+            } catch {
+              // ignore
+            }
+            eventLogger?.log?.('subagent_notice', {
+              agent: agentRef.agent.id,
+              text: notice,
+              source: 'system',
+              kind: 'agent',
+              fromModel: failedModel,
+              toModel: fallbackModel,
+              reason: info.reason,
+              error: info,
+            });
+            continue;
+          }
           throw err;
         } finally {
           if (activeController === controller) {
@@ -315,7 +364,7 @@ registerTool({
     }
     eventLogger?.log?.('subagent_done', {
       agent: agentRef.agent.id,
-      model: targetModel,
+      model: activeModel,
       responsePreview: responseText ? responseText.slice(0, 400) : '',
     });
     summaryManager.maybeSummarize(subSession);
