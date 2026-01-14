@@ -345,11 +345,14 @@ export function useChatSessions() {
     try {
       const result = await api.invoke('dialog:selectDirectory', { defaultPath: preferred || undefined });
       if (result?.ok && typeof result?.path === 'string' && result.path.trim()) {
-        await setWorkspaceRoot(result.path.trim());
+        const picked = result.path.trim();
+        await setWorkspaceRoot(picked);
+        return picked;
       }
     } catch (err) {
       toast.error(err?.message || '选择目录失败');
     }
+    return '';
   };
 
   const clearWorkspaceRoot = async () => {

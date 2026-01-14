@@ -274,13 +274,10 @@ export function ChatView({ admin }) {
                   <Button
                     size="small"
                     icon={<FolderOpenOutlined />}
-                    onClick={() => pickWorkspaceRoot?.()}
+                    onClick={() => setWorkspaceModalOpen(true)}
                     disabled={Boolean(streamState)}
                   >
-                    选择目录
-                  </Button>
-                  <Button size="small" onClick={() => setWorkspaceModalOpen(true)} disabled={Boolean(streamState)}>
-                    手动设置
+                    设置目录
                   </Button>
                   <Button
                     size="small"
@@ -328,12 +325,30 @@ export function ChatView({ admin }) {
           setWorkspaceRoot?.(workspaceDraft);
         }}
       >
-        <Input
-          value={workspaceDraft}
-          onChange={(e) => setWorkspaceDraft(e.target.value)}
-          placeholder="输入工作目录路径（绝对路径）"
-          allowClear
-        />
+        <Space size={8} align="start" style={{ width: '100%' }}>
+          <Input
+            value={workspaceDraft}
+            onChange={(e) => setWorkspaceDraft(e.target.value)}
+            placeholder="输入工作目录路径（绝对路径）"
+            allowClear
+            style={{ flex: 1, minWidth: 0 }}
+            disabled={Boolean(streamState)}
+          />
+          {pickWorkspaceRoot ? (
+            <Button
+              icon={<FolderOpenOutlined />}
+              onClick={() => {
+                void (async () => {
+                  const picked = await pickWorkspaceRoot?.();
+                  if (picked) setWorkspaceModalOpen(false);
+                })();
+              }}
+              disabled={Boolean(streamState)}
+            >
+              选择目录
+            </Button>
+          ) : null}
+        </Space>
         <Typography.Text type="secondary" style={{ display: 'block', marginTop: 10 }}>
           该会话的 MCP 工具会以此目录作为 root。
         </Typography.Text>
