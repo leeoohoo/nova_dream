@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { copyDir, ensureDir, isDirectory, writeJson, writeText } from './fs.js';
+import { copyDir, ensureDir, isDirectory, isFile, readJson, writeJson, writeText } from './fs.js';
 
 function packageRoot() {
   // src/lib/template.js -> src -> package root
@@ -15,6 +15,44 @@ export function getTemplateDir(name) {
   const dir = path.join(root, 'templates', name);
   if (!isDirectory(dir)) throw new Error(`template not found: ${name}`);
   return dir;
+}
+
+export function readTemplateMeta(name) {
+  const dir = getTemplateDir(name);
+  const metaPath = path.join(dir, 'template.json');
+  if (!isFile(metaPath)) return { name, description: '', defaults: null };
+  try {
+    const meta = readJson(metaPath);
+    return {
+      name,
+      description: typeof meta?.description === 'string' ? meta.description.trim() : '',
+      defaults: meta?.defaults && typeof meta.defaults === 'object' ? meta.defaults : null,
+    };
+  } catch {
+    return { name, description: '', defaults: null };
+  }
+}
+
+export function listTemplates() {
+  const root = packageRoot();
+  const templatesDir = path.join(root, 'templates');
+  let entries = [];
+  try {
+    entries = fs.readdirSync(templatesDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  for (const ent of entries) {
+    if (!ent?.isDirectory?.()) continue;
+    const name = String(ent.name || '').trim();
+    if (!name || name.startsWith('.')) continue;
+    if (!isDirectory(path.join(templatesDir, name))) continue;
+    out.push(readTemplateMeta(name));
+  }
+  out.sort((a, b) => a.name.localeCompare(b.name));
+  return out;
 }
 
 export function copyTemplate({ templateName, destDir }) {
@@ -62,31 +100,42 @@ export function writeScaffoldManifest({ destPluginDir, pluginId, pluginName, ver
 }
 
 export function writeScaffoldPackageJson({ destDir, projectName }) {
-  const pkg = {
-    name: projectName,
-    private: true,
-    type: 'module',
-    scripts: {
-      dev: 'chatos-uiapp dev',
-      validate: 'chatos-uiapp validate',
-      pack: 'chatos-uiapp pack',
-      'install:chatos': 'chatos-uiapp install --host-app chatos',
-    },
-    devDependencies: {
-      '@chatos/ui-apps-devkit': '^0.1.0',
-    },
+  const baseScripts = {
+    dev: 'chatos-uiapp dev',
+    validate: 'chatos-uiapp validate',
+    pack: 'chatos-uiapp pack',
+    'install:chatos': 'chatos-uiapp install --host-app chatos',
   };
 
-  writeJson(path.join(destDir, 'package.json'), pkg);
+  const pkgPath = path.join(destDir, 'package.json');
+  const existing = isFile(pkgPath) ? readJson(pkgPath) : {};
+  const pkg = existing && typeof existing === 'object' ? existing : {};
+
+  pkg.name = projectName;
+  pkg.private = true;
+  pkg.type = 'module';
+
+  pkg.scripts = pkg.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {};
+  for (const [key, value] of Object.entries(baseScripts)) {
+    if (!pkg.scripts[key]) pkg.scripts[key] = value;
+  }
+
+  pkg.devDependencies = pkg.devDependencies && typeof pkg.devDependencies === 'object' ? pkg.devDependencies : {};
+  if (!pkg.devDependencies['@chatos/ui-apps-devkit']) {
+    pkg.devDependencies['@chatos/ui-apps-devkit'] = '^0.1.0';
+  }
+
+  writeJson(pkgPath, pkg);
   return pkg;
 }
 
 export function writeScaffoldConfig({ destDir, pluginDir = 'plugin', appId = '' }) {
-  const cfg = {
-    pluginDir,
-    appId,
-  };
-  writeJson(path.join(destDir, 'chatos.config.json'), cfg);
+  const cfgPath = path.join(destDir, 'chatos.config.json');
+  const existing = isFile(cfgPath) ? readJson(cfgPath) : {};
+  const cfg = existing && typeof existing === 'object' ? existing : {};
+  cfg.pluginDir = pluginDir;
+  cfg.appId = appId;
+  writeJson(cfgPath, cfg);
   return cfg;
 }
 

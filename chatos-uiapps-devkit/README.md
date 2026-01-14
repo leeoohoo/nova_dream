@@ -28,6 +28,17 @@ npm install
 npm run dev
 ```
 
+## 模板
+
+```bash
+chatos-uiapp init --list-templates
+chatos-uiapp init my-app --template basic
+chatos-uiapp init my-app --template notepad
+```
+
+- `basic`：最小可运行骨架（含 `host.chat.*` / `ctx.llm.complete()` 示例）
+- `notepad`：完整示例应用（文件夹/标签/搜索/后端持久化）
+
 完成开发后：
 
 ```bash
@@ -53,8 +64,7 @@ my-first-uiapp/
 ## CLI
 
 - `chatos-uiapp init <dir>`：生成工程
-- `chatos-uiapp dev`：启动本地运行沙箱
+- `chatos-uiapp dev`：启动本地运行沙箱（支持文件变更自动重载）
 - `chatos-uiapp validate`：校验 manifest 与路径边界
 - `chatos-uiapp pack`：打包 `.zip`（用于 ChatOS 导入）
 - `chatos-uiapp install`：复制到本机 ChatOS 用户插件目录
-

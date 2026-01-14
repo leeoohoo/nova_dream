@@ -6,6 +6,7 @@ export function mount({ container, host, slots }) {
     slots?.header && typeof slots.header === 'object' && typeof slots.header.appendChild === 'function' ? slots.header : null;
 
   const ctx = typeof host?.context?.get === 'function' ? host.context.get() : { pluginId: '', appId: '', theme: 'light' };
+  const bridgeEnabled = Boolean(ctx?.bridge?.enabled);
 
   const root = document.createElement('div');
   root.style.height = '100%';
@@ -22,7 +23,7 @@ export function mount({ container, host, slots }) {
   const meta = document.createElement('div');
   meta.style.fontSize = '12px';
   meta.style.opacity = '0.75';
-  meta.textContent = `${ctx?.pluginId || ''}:${ctx?.appId || ''} · theme=${ctx?.theme || 'light'} · bridge=${host?.bridge?.enabled ? 'enabled' : 'disabled'}`;
+  meta.textContent = `${ctx?.pluginId || ''}:${ctx?.appId || ''} · theme=${ctx?.theme || 'light'} · bridge=${bridgeEnabled ? 'enabled' : 'disabled'}`;
 
   const header = document.createElement('div');
   header.appendChild(title);
@@ -41,6 +42,18 @@ export function mount({ container, host, slots }) {
   actions.style.padding = '12px';
   actions.style.display = 'grid';
   actions.style.gap = '10px';
+
+  const input = document.createElement('textarea');
+  input.placeholder = '输入要发送给 ChatOS / 后端 LLM 的内容…';
+  input.style.width = '100%';
+  input.style.minHeight = '86px';
+  input.style.boxSizing = 'border-box';
+  input.style.borderRadius = '12px';
+  input.style.border = '1px solid rgba(0,0,0,0.14)';
+  input.style.background = 'rgba(0,0,0,0.04)';
+  input.style.padding = '10px 10px';
+  input.style.resize = 'vertical';
+  input.style.outline = 'none';
 
   const log = document.createElement('pre');
   log.style.border = '1px solid rgba(0,0,0,0.12)';
@@ -69,13 +82,33 @@ export function mount({ container, host, slots }) {
     return btn;
   };
 
-  const btnPing = mkBtn('backend.invoke("ping")');
-  btnPing.addEventListener('click', async () => {
+  const run = async (label, fn) => {
     try {
-      const res = await host.backend.invoke('ping', { hello: 'world' });
-      appendLog('backend.invoke', res);
+      const res = await fn();
+      appendLog(label, res);
+      return res;
     } catch (e) {
-      appendLog('backend.invoke.error', { message: e?.message || String(e) });
+      appendLog(`${label}.error`, { message: e?.message || String(e) });
+      return null;
+    }
+  };
+
+  const btnPing = mkBtn('backend.invoke("ping")');
+  btnPing.addEventListener('click', () => run('backend.invoke', () => host.backend.invoke('ping', { hello: 'world' })));
+
+  const btnLlmComplete = mkBtn('backend.invoke("llmComplete")');
+  btnLlmComplete.addEventListener('click', async () => {
+    const text = String(input.value || '').trim();
+    if (!text) return;
+    btnLlmComplete.disabled = true;
+    try {
+      const res = await run('backend.invoke.llmComplete', () => host.backend.invoke('llmComplete', { input: text }));
+      if (res?.content) {
+        log.textContent += `\n[sandbox llm]\n${String(res.content)}\n`;
+        log.scrollTop = log.scrollHeight;
+      }
+    } finally {
+      btnLlmComplete.disabled = false;
     }
   });
 
@@ -100,8 +133,94 @@ export function mount({ container, host, slots }) {
     }
   });
 
+  let activeSessionId = '';
+  let chatUnsub = null;
+
+  const ensureSession = async () => {
+    const agents = await run('chat.agents.list', () => host.chat.agents.list());
+    let agentId = agents?.agents?.[0]?.id || '';
+    if (!agentId) {
+      const ensured = await run('chat.agents.ensureDefault', () => host.chat.agents.ensureDefault());
+      agentId = ensured?.agent?.id || ensured?.agents?.[0]?.id || '';
+    }
+    if (!agentId) throw new Error('no agentId');
+
+    const res = await run('chat.sessions.ensureDefault', () => host.chat.sessions.ensureDefault({ agentId }));
+    activeSessionId = res?.session?.id || '';
+    if (activeSessionId) appendLog('activeSessionId', activeSessionId);
+    return activeSessionId;
+  };
+
+  const btnEnsureSession = mkBtn('chat.sessions.ensureDefault');
+  btnEnsureSession.addEventListener('click', () => ensureSession().catch((e) => appendLog('chat.ensureSession.error', { message: e?.message || String(e) })));
+
+  const btnSend = mkBtn('chat.send');
+  btnSend.addEventListener('click', async () => {
+    const text = String(input.value || '').trim();
+    if (!text) return;
+    btnSend.disabled = true;
+    try {
+      if (!activeSessionId) await ensureSession();
+      if (!activeSessionId) throw new Error('no sessionId');
+      await run('chat.send', () => host.chat.send({ sessionId: activeSessionId, text }));
+      input.value = '';
+    } finally {
+      btnSend.disabled = false;
+    }
+  });
+
+  const btnSub = mkBtn('chat.events.subscribe');
+  btnSub.addEventListener('click', async () => {
+    if (!activeSessionId) await ensureSession();
+    if (!activeSessionId) {
+      appendLog('chat.events.subscribe.error', { message: 'no sessionId' });
+      return;
+    }
+    if (chatUnsub) {
+      try {
+        chatUnsub();
+      } catch {
+        // ignore
+      }
+      chatUnsub = null;
+    }
+    try {
+      chatUnsub = host.chat.events.subscribe({ sessionId: activeSessionId }, (payload) => {
+        appendLog('chat.event', payload);
+        if (payload?.type === 'assistant_delta' && payload?.delta) {
+          log.textContent += payload.delta;
+          log.scrollTop = log.scrollHeight;
+        }
+      });
+      appendLog('chat.events.subscribe', { ok: true });
+    } catch (e) {
+      appendLog('chat.events.subscribe.error', { message: e?.message || String(e) });
+    }
+  });
+
+  const btnUnsub = mkBtn('chat.events.unsubscribe');
+  btnUnsub.addEventListener('click', () => {
+    if (chatUnsub) {
+      try {
+        chatUnsub();
+      } catch {
+        // ignore
+      }
+      chatUnsub = null;
+      appendLog('chat.events.unsubscribe', { ok: true });
+      return;
+    }
+    run('chat.events.unsubscribe', () => host.chat.events.unsubscribe());
+  });
+
   actions.appendChild(btnPing);
+  actions.appendChild(btnLlmComplete);
   actions.appendChild(btnPrompt);
+  actions.appendChild(input);
+  actions.appendChild(btnEnsureSession);
+  actions.appendChild(btnSend);
+  actions.appendChild(btnSub);
+  actions.appendChild(btnUnsub);
 
   body.appendChild(actions);
   body.appendChild(log);
@@ -127,6 +246,14 @@ export function mount({ container, host, slots }) {
   container.appendChild(root);
 
   return () => {
+    if (chatUnsub) {
+      try {
+        chatUnsub();
+      } catch {
+        // ignore
+      }
+      chatUnsub = null;
+    }
     try {
       container.textContent = '';
     } catch {
@@ -134,4 +261,3 @@ export function mount({ container, host, slots }) {
     }
   };
 }
-

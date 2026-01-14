@@ -1,9 +1,11 @@
 import path from 'path';
 import readline from 'readline';
 
-import { ensureDir, isDirectory, rmForce, writeText } from '../lib/fs.js';
+import { ensureDir, isDirectory, isFile, rmForce, writeText } from '../lib/fs.js';
 import {
   copyTemplate,
+  listTemplates,
+  readTemplateMeta,
   maybeReplaceTokensInFile,
   writeScaffoldConfig,
   writeScaffoldManifest,
@@ -27,8 +29,25 @@ async function promptLine(question, { defaultValue = '' } = {}) {
 }
 
 export async function cmdInit({ positionals, flags }) {
+  const list = Boolean(flags['list-templates'] || flags.listTemplates);
+  if (list) {
+    const templates = listTemplates();
+    if (templates.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log('No templates found.');
+      return;
+    }
+    const lines = templates.map((t) => `- ${t.name}${t.description ? `: ${t.description}` : ''}`).join('\n');
+    // eslint-disable-next-line no-console
+    console.log(`Templates:\n${lines}\n\nUse:\n  chatos-uiapp init my-app --template <name>\n`);
+    return;
+  }
+
   const dirArg = String(positionals[0] || '').trim();
   if (!dirArg) throw new Error('init requires <dir>');
+
+  const templateName = String(flags.template || flags.t || '').trim() || 'basic';
+  const templateMeta = readTemplateMeta(templateName);
 
   const destDir = path.resolve(process.cwd(), dirArg);
   const force = Boolean(flags.force);
@@ -48,19 +67,28 @@ export async function cmdInit({ positionals, flags }) {
   }
 
   ensureDir(destDir);
-  copyTemplate({ templateName: 'basic', destDir });
+  copyTemplate({ templateName, destDir });
 
   const pluginId =
     String(flags['plugin-id'] || flags.pluginId || '').trim() || (await promptLine('pluginId (e.g. com.example.myapp): '));
   const pluginName =
-    String(flags.name || '').trim() || (await promptLine('plugin name (display): ', { defaultValue: pluginId }));
-  const appId = String(flags['app-id'] || flags.appId || '').trim() || (await promptLine('appId (e.g. manager): ', { defaultValue: 'app' }));
-  const version = String(flags.version || '').trim() || '0.1.0';
+    String(flags.name || '').trim() ||
+    (await promptLine('plugin name (display): ', { defaultValue: String(templateMeta?.defaults?.pluginName || '').trim() || pluginId }));
+
+  const defaultAppId = String(templateMeta?.defaults?.appId || '').trim() || 'app';
+  const appId =
+    String(flags['app-id'] || flags.appId || '').trim() ||
+    (await promptLine('appId (e.g. manager): ', { defaultValue: defaultAppId }));
+
+  const version = String(flags.version || '').trim() || String(templateMeta?.defaults?.version || '').trim() || '0.1.0';
 
   const pluginDir = path.join(destDir, 'plugin');
   ensureDir(pluginDir);
 
-  writeScaffoldManifest({ destPluginDir: pluginDir, pluginId, pluginName, version, appId, withBackend: true });
+  if (!isFile(path.join(pluginDir, 'plugin.json'))) {
+    const withBackend = templateMeta?.defaults?.withBackend !== false;
+    writeScaffoldManifest({ destPluginDir: pluginDir, pluginId, pluginName, version, appId, withBackend });
+  }
   writeScaffoldPackageJson({ destDir, projectName: path.basename(destDir) });
   writeScaffoldConfig({ destDir, pluginDir: 'plugin', appId });
 
@@ -82,10 +110,14 @@ export async function cmdInit({ positionals, flags }) {
     __PLUGIN_ID__: pluginId,
     __PLUGIN_NAME__: pluginName,
     __APP_ID__: appId,
+    __VERSION__: version,
   };
 
   maybeReplaceTokensInFile(path.join(destDir, 'README.md'), replacements);
   maybeReplaceTokensInFile(path.join(destDir, 'chatos.config.json'), replacements);
+  if (isFile(path.join(pluginDir, 'plugin.json'))) {
+    maybeReplaceTokensInFile(path.join(pluginDir, 'plugin.json'), replacements);
+  }
   maybeReplaceTokensInFile(path.join(pluginDir, 'backend', 'index.mjs'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'index.mjs'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'mcp-server.mjs'), replacements);
@@ -107,4 +139,3 @@ Next:
   npm run dev
 `);
 }
-

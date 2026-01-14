@@ -12,7 +12,8 @@ function printHelp() {
   console.log(`chatos-uiapp
 
 Usage:
-  chatos-uiapp init <dir> [--plugin-id <id>] [--name <name>] [--app-id <appId>] [--version <semver>]
+  chatos-uiapp init <dir> [--template <name>] [--force] [--plugin-id <id>] [--name <name>] [--app-id <appId>] [--version <semver>]
+  chatos-uiapp init --list-templates
   chatos-uiapp dev [--port 4399] [--app <appId>] [--plugin-dir <path>]
   chatos-uiapp validate [--plugin-dir <path>]
   chatos-uiapp pack [--out <zipPath>] [--plugin-dir <path>]
@@ -20,6 +21,8 @@ Usage:
 
 Examples:
   chatos-uiapp init my-app
+  chatos-uiapp init my-app --template notepad
+  chatos-uiapp init --list-templates
   chatos-uiapp dev --port 4399
   chatos-uiapp install --host-app chatos
 `);
@@ -48,4 +51,3 @@ export async function runCli(argv) {
     process.exitCode = 1;
   }
 }
-
