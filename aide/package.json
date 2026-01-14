@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@leeoohoo/aide",
   "version": "0.1.1",
   "description": "Terminal chat client for multiple AI models (CLI + Electron UI).",
@@ -33,6 +33,7 @@
     "ui": "node scripts/build-ui.js --skip-if-present && node scripts/build-cli-ui-plugin.js --skip-if-present && electron electron/main.js"
   },
   "dependencies": {
+    "@leeoohoo/common": "^0.1.1",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@ant-design/icons": "^5.6.1",
     "antd": "^5.21.2",

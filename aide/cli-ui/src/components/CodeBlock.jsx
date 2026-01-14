@@ -1,1 +1,1 @@
-export * from '../../../../common/aide-ui/components/CodeBlock.jsx';
+export * from '@leeoohoo/common/aide-ui/components/CodeBlock.jsx';

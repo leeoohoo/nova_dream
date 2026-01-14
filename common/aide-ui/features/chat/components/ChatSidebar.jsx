@@ -69,7 +69,13 @@ export function ChatSidebar({
           disabled={streaming}
           style={{ width: '100%' }}
         />
-        {currentAgent?.description ? <Text type="secondary">{currentAgent.description}</Text> : <Text type="secondary">在顶部 “Agent” 子菜单中管理/新增。</Text>}
+        {currentAgent?.description ? (
+          <Text type="secondary" style={{ whiteSpace: 'pre-wrap' }}>
+            {currentAgent.description}
+          </Text>
+        ) : (
+          <Text type="secondary">在顶部 “Agent” 子菜单中管理/新增。</Text>
+        )}
       </Space>
 
       <Divider style={{ margin: '10px 0' }} />

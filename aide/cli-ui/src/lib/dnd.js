@@ -1,1 +1,1 @@
-export * from '../../../../common/aide-ui/lib/dnd.js';
+export * from '@leeoohoo/common/aide-ui/lib/dnd.js';

@@ -1,1 +1,1 @@
-export * from '../../../../common/admin-data/services/index.js';
+export * from '@leeoohoo/common/admin-data/services/index.js';

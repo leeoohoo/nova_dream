@@ -102,7 +102,11 @@ async function main() {
     platform: 'browser',
     target: ['chrome120'],
     loader: { '.js': 'jsx', '.jsx': 'jsx' },
-    nodePaths: [path.join(root, 'node_modules'), path.resolve(root, '..', 'deepseek_cli', 'node_modules')],
+    nodePaths: [
+      path.resolve(root, '..', 'node_modules'),
+      path.resolve(root, '..', 'deepseek_cli', 'node_modules'),
+      path.join(root, 'node_modules'),
+    ],
   });
   console.log(`CLI UI plugin built to ${outfile}`);
 }

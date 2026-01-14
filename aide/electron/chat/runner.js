@@ -120,6 +120,7 @@ function getMcpPromptNameForServer(serverName, language) {
 
 function buildSystemPrompt({ agent, prompts, subagents, mcpServers, language, extraPromptNames, autoMcpPrompts = true } = {}) {
   const agentRecord = agent && typeof agent === 'object' ? agent : {};
+  const inlineAgentPrompt = typeof agentRecord?.prompt === 'string' ? agentRecord.prompt.trim() : '';
   const promptById = new Map((Array.isArray(prompts) ? prompts : []).map((p) => [p.id, p]));
   const promptByName = new Map(
     (Array.isArray(prompts) ? prompts : [])
@@ -208,6 +209,9 @@ function buildSystemPrompt({ agent, prompts, subagents, mcpServers, language, ex
   }
 
   const blocks = [];
+  if (inlineAgentPrompt) {
+    blocks.push(inlineAgentPrompt);
+  }
   if (promptSections.length > 0) {
     blocks.push(promptSections.join('\n\n'));
   }

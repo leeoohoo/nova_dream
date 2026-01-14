@@ -1,2 +1,1 @@
-export * from '../../common/secrets-env.js';
-
+export * from '@leeoohoo/common/secrets-env.js';

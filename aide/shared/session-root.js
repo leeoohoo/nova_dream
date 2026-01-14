@@ -1,4 +1,7 @@
-import { persistSessionRoot as persistSessionRootCore, resolveSessionRoot as resolveSessionRootCore } from '../../common/state-core/session-root.js';
+import {
+  persistSessionRoot as persistSessionRootCore,
+  resolveSessionRoot as resolveSessionRootCore,
+} from '@leeoohoo/common/state-core/session-root.js';
 
 export function resolveSessionRoot() {
   return resolveSessionRootCore({ fallbackHostApp: 'aide' });
@@ -7,4 +10,3 @@ export function resolveSessionRoot() {
 export function persistSessionRoot(sessionRoot) {
   return persistSessionRootCore(sessionRoot, { fallbackHostApp: 'aide' });
 }
-

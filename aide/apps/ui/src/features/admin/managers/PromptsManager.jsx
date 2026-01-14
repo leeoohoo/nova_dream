@@ -1,1 +1,1 @@
-export * from '../../../../../../../common/aide-ui/features/admin/managers/PromptsManager.jsx';
+export * from '@leeoohoo/common/aide-ui/features/admin/managers/PromptsManager.jsx';

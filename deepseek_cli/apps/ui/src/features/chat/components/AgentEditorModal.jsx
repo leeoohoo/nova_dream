@@ -28,6 +28,15 @@ function parseUiAppKey(key) {
 
 export function AgentEditorModal({ open, initialValues, models, mcpServers, prompts, uiApps, onCancel, onSave }) {
   const [form] = Form.useForm();
+  const markdownEditorStyle = useMemo(
+    () => ({
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontSize: 13,
+      lineHeight: '20px',
+    }),
+    []
+  );
 
   const uniqueIds = (list) => {
     const out = [];
@@ -329,6 +338,7 @@ export function AgentEditorModal({ open, initialValues, models, mcpServers, prom
     form.setFieldsValue({
       name: initialValues?.name || '',
       description: initialValues?.description || '',
+      prompt: initialValues?.prompt || '',
       modelId: initialValues?.modelId || '',
       uiApps: normalizedUiApps,
     });
@@ -515,7 +525,14 @@ export function AgentEditorModal({ open, initialValues, models, mcpServers, prom
           <Input placeholder="例如：前端助手 / 需求分析师" />
         </Form.Item>
         <Form.Item name="description" label="描述">
-          <Input placeholder="可选" />
+          <Input.TextArea
+            placeholder="可选（支持 Markdown）"
+            autoSize={{ minRows: 3, maxRows: 10 }}
+            style={markdownEditorStyle}
+          />
+        </Form.Item>
+        <Form.Item name="prompt" label="Prompt" extra="作为系统提示，在与该 Agent 对话时自动注入（支持 Markdown）。">
+          <Input.TextArea placeholder="可选" autoSize={{ minRows: 6, maxRows: 16 }} style={markdownEditorStyle} />
         </Form.Item>
         <Form.Item name="modelId" label="模型" rules={[{ required: true, message: '请选择模型' }]}>
           <Select options={modelOptions} showSearch optionFilterProp="label" placeholder="选择模型" />

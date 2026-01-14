@@ -1,0 +1,11 @@
+{
+  "name": "nova_dream",
+  "private": true,
+  "workspaces": [
+    "common",
+    "aide",
+    "deepseek_cli",
+    "chatos-uiapps-devkit"
+  ]
+}
+

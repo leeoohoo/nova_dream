@@ -6,8 +6,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
-import { createDb } from '../../common/admin-data/storage.js';
-import { createAdminServices } from '../../common/admin-data/services/index.js';
+import { createDb } from '@leeoohoo/common/admin-data/storage.js';
+import { createAdminServices } from '@leeoohoo/common/admin-data/services/index.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 
 const __filename = fileURLToPath(import.meta.url);

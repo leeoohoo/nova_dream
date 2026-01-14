@@ -1,1 +1,1 @@
-export * from '../../../../../../../common/aide-ui/features/admin/managers/SecretsManager.jsx';
+export * from '@leeoohoo/common/aide-ui/features/admin/managers/SecretsManager.jsx';

@@ -7,7 +7,7 @@ import {
   parseMcpServers,
   parseModelsWithDefault,
   safeRead,
-} from '../../common/admin-data/legacy.js';
+} from '@leeoohoo/common/admin-data/legacy.js';
 
 export { resolveSessionRoot, persistSessionRoot } from '../src/session-root.js';
 

@@ -39,6 +39,7 @@ export function useChatAgents({ models } = {}) {
     setAgentModalInitial({
       name: '',
       description: '',
+      prompt: '',
       modelId: defaultModelId,
       uiApps: [],
     });
@@ -51,6 +52,7 @@ export function useChatAgents({ models } = {}) {
       id: agent.id,
       name: agent.name || '',
       description: agent.description || '',
+      prompt: agent.prompt || '',
       modelId: agent.modelId || '',
       uiApps: Array.isArray(agent.uiApps) ? agent.uiApps : [],
     });
@@ -67,6 +69,7 @@ export function useChatAgents({ models } = {}) {
     const payload = {
       name: values?.name,
       description: values?.description,
+      prompt: values?.prompt,
       modelId: values?.modelId,
       uiApps: values?.uiApps,
     };

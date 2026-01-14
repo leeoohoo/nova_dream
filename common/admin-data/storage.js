@@ -1,27 +1,17 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { requireFromWorkspace, resolveFromWorkspace } from './deps.js';
+import { createRequire } from 'module';
 import { createDb as createDbCore } from '../state-core/db.js';
 import { getHomeDir, resolveHostApp } from '../state-core/utils.js';
 
 const LEGACY_DEFAULT_DB_PATH = path.join(os.homedir(), '.deepseek_cli', 'admin.db.sqlite');
 
-const initSqlJsPkg = requireFromWorkspace('sql.js');
-const initSqlJs = (initSqlJsPkg && typeof initSqlJsPkg === 'object' && 'default' in initSqlJsPkg)
-  ? initSqlJsPkg.default
-  : initSqlJsPkg;
-
-function resolveSqlWasmPath() {
-  try {
-    return resolveFromWorkspace('sql.js/dist/sql-wasm.wasm');
-  } catch {
-    const sqlMain = resolveFromWorkspace('sql.js');
-    return path.join(path.dirname(sqlMain), 'sql-wasm.wasm');
-  }
-}
-
-const wasmPath = resolveSqlWasmPath();
+const require = createRequire(import.meta.url);
+const initSqlJsPkg = require('sql.js');
+const initSqlJs =
+  initSqlJsPkg && typeof initSqlJsPkg === 'object' && 'default' in initSqlJsPkg ? initSqlJsPkg.default : initSqlJsPkg;
+const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
 const wasmBinary = fs.readFileSync(wasmPath);
 const SQL = await initSqlJs({ wasmBinary });
 

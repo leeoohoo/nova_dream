@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { GlobalStyles as BaseGlobalStyles } from '../../../../../common/aide-ui/components/GlobalStyles.jsx';
+import { GlobalStyles as BaseGlobalStyles } from '@leeoohoo/common/aide-ui/components/GlobalStyles.jsx';
 
 const EXTRA_CSS = `
       .ds-ui-app-header-slot:empty {

@@ -1,8 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { requireFromWorkspace } from './deps.js';
-
-const YAML = requireFromWorkspace('yaml');
+import YAML from 'yaml';
 
 function ensureDir(filePath) {
   const dir = path.dirname(filePath);

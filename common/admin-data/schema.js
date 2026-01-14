@@ -1,6 +1,4 @@
-import { requireFromWorkspace } from './deps.js';
-
-const { z } = requireFromWorkspace('zod');
+import { z } from 'zod';
 
 export const TABLE_SCHEMAS = {
   models: {

@@ -1,1 +1,1 @@
-export * from '../../../common/admin-data/legacy.js';
+export * from '@leeoohoo/common/admin-data/legacy.js';

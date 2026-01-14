@@ -1,1 +1,1 @@
-export * from '../../../../common/admin-data/services/task-service.js';
+export * from '@leeoohoo/common/admin-data/services/task-service.js';

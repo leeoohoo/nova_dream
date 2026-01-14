@@ -1,2 +1,1 @@
-export * from '../../common/host-app.js';
-
+export * from '@leeoohoo/common/host-app.js';

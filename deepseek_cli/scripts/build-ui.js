@@ -108,7 +108,11 @@ async function main() {
     target: ['chrome120', 'node18'],
     loader: { '.js': 'jsx', '.jsx': 'jsx', '.css': 'css' },
     external: [],
-    nodePaths: [path.join(root, 'node_modules'), path.resolve(root, '..', 'aide', 'node_modules')],
+    nodePaths: [
+      path.resolve(root, '..', 'node_modules'),
+      path.join(root, 'node_modules'),
+      path.resolve(root, '..', 'aide', 'node_modules'),
+    ],
   });
   const html = fs.readFileSync(htmlSrc, 'utf8');
   fs.writeFileSync(htmlOut, html, 'utf8');

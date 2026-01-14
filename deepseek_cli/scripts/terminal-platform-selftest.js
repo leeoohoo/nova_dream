@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 
-import { getDefaultTtyPaths } from '../../common/terminal/tty-paths.js';
+import { getDefaultTtyPaths } from '@leeoohoo/common/terminal/tty-paths.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 
 const __filename = fileURLToPath(import.meta.url);

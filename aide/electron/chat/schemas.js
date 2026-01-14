@@ -27,6 +27,7 @@ export const chatAgentSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1, 'name is required'),
   description: z.string().trim().optional().default(''),
+  prompt: z.string().optional().default(''),
   modelId: z.string().trim().min(1, 'modelId is required'),
   promptIds: z.array(z.string().trim()).optional().default([]),
   subagentIds: z.array(z.string().trim()).optional().default([]),

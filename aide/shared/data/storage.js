@@ -1,1 +1,1 @@
-export * from '../../../common/admin-data/storage.js';
+export * from '@leeoohoo/common/admin-data/storage.js';

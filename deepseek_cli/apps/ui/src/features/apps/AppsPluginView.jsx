@@ -245,6 +245,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
             const payload = params && typeof params === 'object' ? params : {};
             const preferredName = typeof payload?.name === 'string' ? payload.name.trim() : '';
             const preferredDescription = typeof payload?.description === 'string' ? payload.description.trim() : '';
+            const preferredPrompt = typeof payload?.prompt === 'string' ? payload.prompt : '';
             const preferredModelId = typeof payload?.modelId === 'string' ? payload.modelId.trim() : '';
             const base = await api.invoke('chat:agents:ensureDefault');
             if (base?.ok === false) throw new Error(base?.message || 'ensureDefault agent failed');
@@ -254,6 +255,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
             const agentPayload = {
               name: preferredName || `${pluginId}:${appId} Agent`,
               description: preferredDescription || `应用专用 Agent（${pluginId}:${appId}）`,
+              prompt: preferredPrompt,
               modelId,
               promptIds: Array.isArray(payload?.promptIds) ? payload.promptIds : [],
               subagentIds: Array.isArray(payload?.subagentIds) ? payload.subagentIds : [],

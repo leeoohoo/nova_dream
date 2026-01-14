@@ -1,1 +1,1 @@
-export * from '../../../../../../../common/aide-ui/features/chat/components/ChatComposer.jsx';
+export * from '@leeoohoo/common/aide-ui/features/chat/components/ChatComposer.jsx';

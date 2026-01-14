@@ -114,7 +114,9 @@ export function ChatAgentsView({ admin }) {
                         </Space>
                       }
                     >
-                      {agent?.description ? <div style={{ marginBottom: 10 }}>{agent.description}</div> : null}
+                      {agent?.description ? (
+                        <div style={{ marginBottom: 10, whiteSpace: 'pre-wrap' }}>{agent.description}</div>
+                      ) : null}
                       <Space size={[6, 6]} wrap>
                         <Tag>Apps: {appCount}</Tag>
                       </Space>

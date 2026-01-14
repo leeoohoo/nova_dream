@@ -7,7 +7,7 @@ import {
   resolveAppDbJsonFileName as resolveAppDbJsonFileNameCore,
   resolveAppStateDir as resolveAppStateDirCore,
   resolveLegacyStateDir as resolveLegacyStateDirCore,
-} from '../../common/state-core/state-paths.js';
+} from '@leeoohoo/common/state-core/state-paths.js';
 
 export function resolveLegacyStateDir(sessionRoot) {
   return resolveLegacyStateDirCore(sessionRoot);

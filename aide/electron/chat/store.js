@@ -111,6 +111,7 @@ export function createChatStore(db) {
     return createAgent({
       name,
       description: 'UI Chat 默认 Agent',
+      prompt: '',
       modelId: normalizedModelId,
       promptIds: [],
       subagentIds: [],

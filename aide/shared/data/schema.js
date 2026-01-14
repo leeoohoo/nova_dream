@@ -1,1 +1,1 @@
-export * from '../../../common/admin-data/schema.js';
+export * from '@leeoohoo/common/admin-data/schema.js';

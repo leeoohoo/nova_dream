@@ -1,1 +1,1 @@
-export * from '../../../../../../../common/aide-ui/features/chat/components/UserMessageCard.jsx';
+export * from '@leeoohoo/common/aide-ui/features/chat/components/UserMessageCard.jsx';

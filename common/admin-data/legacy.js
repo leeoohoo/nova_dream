@@ -1,11 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { requireFromWorkspace } from './deps.js';
+import YAML from 'yaml';
 import { DEFAULT_RUNTIME_SETTINGS } from './schema.js';
 import { getHostApp } from '../host-app.js';
-
-const YAML = requireFromWorkspace('yaml');
 
 export function safeRead(filePath) {
   try {

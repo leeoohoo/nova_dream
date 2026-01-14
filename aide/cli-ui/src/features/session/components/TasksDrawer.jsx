@@ -1,1 +1,1 @@
-export * from '../../../../../../common/aide-ui/features/session/components/TasksDrawer.jsx';
+export * from '@leeoohoo/common/aide-ui/features/session/components/TasksDrawer.jsx';

@@ -1,1 +1,1 @@
-export * from '../../../../common/aide-ui/lib/api.js';
+export * from '@leeoohoo/common/aide-ui/lib/api.js';

@@ -1,1 +1,1 @@
-export * from '../../../../common/admin-data/services/secret-service.js';
+export * from '@leeoohoo/common/admin-data/services/secret-service.js';

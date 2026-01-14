@@ -16,7 +16,7 @@ import { registerUiAppsApi } from './ui-apps/index.js';
 import { installUiAppsPlugins } from './ui-apps/plugin-installer.js';
 import { resolveAideRoot } from '../src/aide-paths.js';
 import { resolveSessionRoot, persistSessionRoot } from '../src/session-root.js';
-import { ensureAppStateDir } from '../../common/state-core/state-paths.js';
+import { ensureAppStateDir } from '@leeoohoo/common/state-core/state-paths.js';
 import { installAideEngine, getAideInstallStatus, detectAideVersion } from './aide-installer.js';
 import { createLspInstaller } from './lsp-installer.js';
 
@@ -737,16 +737,16 @@ ipcMain.handle('lsp:install', async (_event, payload = {}) => {
   }
 });
 
-  if (AIDE_INSTALLED) {
-  const { createAdminDefaultsManager } = await import('./admin-defaults.js');
-  const { createDb } = await import('../../common/admin-data/storage.js');
-  const { createAdminServices } = await import('../../common/admin-data/services/index.js');
-  const { syncAdminToFiles } = await import('../../common/admin-data/sync.js');
-  const { buildAdminSeed, parseMcpServers, loadBuiltinPromptFiles } = await import('../../common/admin-data/legacy.js');
-  const { createWorkspaceOps } = await importAide('electron/workspace.js');
-  const {
-    listSessions,
-    killSession,
+	  if (AIDE_INSTALLED) {
+	  const { createAdminDefaultsManager } = await import('./admin-defaults.js');
+	  const { createDb } = await import('@leeoohoo/common/admin-data/storage.js');
+	  const { createAdminServices } = await import('@leeoohoo/common/admin-data/services/index.js');
+	  const { syncAdminToFiles } = await import('@leeoohoo/common/admin-data/sync.js');
+	  const { buildAdminSeed, parseMcpServers, loadBuiltinPromptFiles } = await import('@leeoohoo/common/admin-data/legacy.js');
+	  const { createWorkspaceOps } = await importAide('electron/workspace.js');
+	  const {
+	    listSessions,
+	    killSession,
     killAllSessions,
     restartSession,
     stopSession,
@@ -755,12 +755,12 @@ ipcMain.handle('lsp:install', async (_event, payload = {}) => {
   const { createSessionApi } = await importAide('electron/session-api.js');
   const { createCliShim } = await importAide('electron/cli-shim.js');
   const { createTerminalManager } = await importAide('electron/terminal-manager.js');
-  const { createSubAgentManager } = await importAideCompat('src/subagents/index.js', 'dist/subagents/index.js');
-  const { registerChatApi } = await importAide('electron/chat/index.js');
-  const { ChatSession } = await importAideCompat('src/session.js', 'dist/session.js');
-  const { ModelClient } = await importAideCompat('src/client.js', 'dist/client.js');
-  const { createAppConfigFromModels } = await importAideCompat('src/config.js', 'dist/config.js');
-  const { applySecretsToProcessEnv } = await import('../../common/secrets-env.js');
+	  const { createSubAgentManager } = await importAideCompat('src/subagents/index.js', 'dist/subagents/index.js');
+	  const { registerChatApi } = await importAide('electron/chat/index.js');
+	  const { ChatSession } = await importAideCompat('src/session.js', 'dist/session.js');
+	  const { ModelClient } = await importAideCompat('src/client.js', 'dist/client.js');
+	  const { createAppConfigFromModels } = await importAideCompat('src/config.js', 'dist/config.js');
+	  const { applySecretsToProcessEnv } = await import('@leeoohoo/common/secrets-env.js');
 
   const defaultPaths = {
     defaultsRoot: cliRoot,

@@ -1,1 +1,1 @@
-export * from '../../../common/terminal/tty-paths.js';
+export * from '@leeoohoo/common/terminal/tty-paths.js';
