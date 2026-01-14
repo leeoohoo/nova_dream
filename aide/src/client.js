@@ -127,7 +127,7 @@ export class ModelClient {
             const argsRaw = call.function?.arguments || '{}';
             let parsedArgs = {};
             try {
-              parsedArgs = parseToolArguments(target.name, argsRaw);
+              parsedArgs = parseToolArguments(target.name, argsRaw, target.definition?.function?.parameters);
             } catch (err) {
               const errText = `[error] Failed to parse tool arguments: ${err.message}`;
               session.addToolResult(call.id, errText);
@@ -200,4 +200,3 @@ export class ModelClient {
     return provider;
   }
 }
-

@@ -721,6 +721,11 @@ export function createNotepadStore({ dataDir } = {}) {
         results.push(note);
         continue;
       }
+      const folderName = normalizeOptionalString(note.folder);
+      if (folderName.toLowerCase().includes(qLower)) {
+        results.push(note);
+        continue;
+      }
       if (!includeContent) continue;
       try {
         const abs = noteFileAbs(notesRoot, note.folder, note.id);

@@ -26,6 +26,7 @@ export function mount({ container, host, slots }) {
     btnToggleEdit,
     createHint,
     searchInput,
+    btnClearSearch,
     folderList,
     tagRow,
     titleInput,
@@ -63,6 +64,8 @@ export function mount({ container, host, slots }) {
   let refreshNotesSeq = 0;
   let openNoteSeq = 0;
   let searchDebounceTimer = null;
+  let searchWasActive = false;
+  let expandedKeysBeforeSearch = null;
 
   const makeNoteKey = (folder, id) => {
     const noteId = normalizeString(id);
@@ -162,6 +165,7 @@ export function mount({ container, host, slots }) {
     setButtonEnabled(btnNewFolder, enabled);
     setButtonEnabled(btnNewNote, enabled);
     searchInput.disabled = !enabled;
+    setButtonEnabled(btnClearSearch, enabled);
     syncEditorControls();
   };
 
@@ -556,7 +560,11 @@ export function mount({ container, host, slots }) {
   };
 
   const renderFolderList = () => {
-    const paths = Array.isArray(folders) ? [...folders] : [];
+    const query = normalizeString(searchInput.value);
+    const isFiltering = Boolean(query) || selectedTags.length > 0;
+
+    const paths = isFiltering ? [] : Array.isArray(folders) ? [...folders] : [];
+    if (isFiltering && selectedFolder) paths.push(selectedFolder);
     const currentId = normalizeString(currentNote?.id);
     (Array.isArray(notes) ? notes : []).forEach((n) => {
       const id = normalizeString(n?.id);
@@ -575,15 +583,42 @@ export function mount({ container, host, slots }) {
 
     const parsed = parseTreeKey(selectedKey);
     const folderToExpand = parsed.kind === 'note' ? parsed.folder : parsed.folder;
-    const expanded = new Set(folderTree.getExpandedKeys());
+    if (!isFiltering && searchWasActive) {
+      searchWasActive = false;
+      folderTree.setExpandedKeys(Array.isArray(expandedKeysBeforeSearch) ? expandedKeysBeforeSearch : ['']);
+      expandedKeysBeforeSearch = null;
+    }
+
+    if (isFiltering && !searchWasActive) {
+      searchWasActive = true;
+      expandedKeysBeforeSearch = folderTree.getExpandedKeys();
+    }
+
+    const expanded = new Set(isFiltering ? [''] : folderTree.getExpandedKeys());
     expanded.add('');
     if (folderToExpand) expanded.add(folderToExpand);
+    if (isFiltering) {
+      const addFolderAndParents = (folder) => {
+        const value = normalizeString(folder);
+        if (!value) return;
+        const parts = value.split('/').filter(Boolean);
+        let acc = '';
+        for (const part of parts) {
+          acc = acc ? `${acc}/${part}` : part;
+          expanded.add(acc);
+        }
+      };
+      notes.forEach((n) => addFolderAndParents(n?.folder));
+      addFolderAndParents(selectedFolder);
+      if (currentNote?.folder) addFolderAndParents(currentNote.folder);
+    }
     folderTree.setExpandedKeys(Array.from(expanded));
 
     folderTree.render({ paths, selectedKey });
   };
 
   const renderTags = () => {
+    if (!tagRow || !tagRow.isConnected) return;
     tagRow.innerHTML = '';
     if (!Array.isArray(tags) || tags.length === 0) {
       const empty = document.createElement('div');
@@ -633,8 +668,12 @@ export function mount({ container, host, slots }) {
     const seq = (refreshFoldersSeq += 1);
     let folderRes = null;
     let tagRes = null;
+    const shouldLoadTags = Boolean(tagRow && tagRow.isConnected);
     try {
-      [folderRes, tagRes] = await Promise.all([api.listFolders(), api.listTags()]);
+      [folderRes, tagRes] = await Promise.all([
+        api.listFolders(),
+        shouldLoadTags ? api.listTags() : Promise.resolve({ ok: true, tags: [] }),
+      ]);
     } catch (err) {
       if (disposed || seq !== refreshFoldersSeq) return;
       setStatus(`Notes: ${err?.message || String(err)}`, 'bad');
@@ -647,22 +686,35 @@ export function mount({ container, host, slots }) {
     tags = Array.isArray(tagRes?.tags) ? tagRes.tags : [];
     renderFolderOptions();
     renderFolderList();
-    renderTags();
+    if (shouldLoadTags) renderTags();
   };
 
   const refreshNotes = async () => {
     const seq = (refreshNotesSeq += 1);
     const query = normalizeString(searchInput.value);
+    const includeContent = query.length >= 2;
     let res = null;
     try {
-      res = await api.listNotes({
-        folder: '',
-        recursive: true,
-        tags: selectedTags,
-        match: 'all',
-        query,
-        limit: 500,
-      });
+      if (!query || !includeContent) {
+        res = await api.listNotes({
+          folder: '',
+          recursive: true,
+          tags: selectedTags,
+          match: 'all',
+          query,
+          limit: 500,
+        });
+      } else {
+        res = await api.searchNotes({
+          query,
+          folder: '',
+          recursive: true,
+          tags: selectedTags,
+          match: 'all',
+          includeContent: true,
+          limit: 200,
+        });
+      }
     } catch (err) {
       if (disposed || seq !== refreshNotesSeq) return;
       setStatus(`Notes: ${err?.message || String(err)}`, 'bad');
@@ -870,10 +922,68 @@ export function mount({ container, host, slots }) {
         // ignore
       }
     }
+    const query = normalizeString(searchInput.value);
+    const delayMs = query.length >= 2 ? 320 : 180;
     searchDebounceTimer = setTimeout(() => {
       searchDebounceTimer = null;
       refreshNotes();
-    }, 180);
+    }, delayMs);
+  });
+
+  searchInput.addEventListener('keydown', async (ev) => {
+    if (disposed) return;
+    const key = ev?.key;
+    if (key === 'Escape') {
+      try {
+        ev.preventDefault();
+      } catch {
+        // ignore
+      }
+      if (!searchInput.value) return;
+      if (searchDebounceTimer) {
+        try {
+          clearTimeout(searchDebounceTimer);
+        } catch {
+          // ignore
+        }
+        searchDebounceTimer = null;
+      }
+      searchInput.value = '';
+      await refreshNotes();
+      return;
+    }
+    if (key !== 'Enter') return;
+    if (!normalizeString(searchInput.value)) return;
+    if (!(await ensureSafeToSwitch())) return;
+    const first = Array.isArray(notes) && notes.length > 0 ? notes[0] : null;
+    const id = normalizeString(first?.id);
+    if (!id) return;
+    try {
+      ev.preventDefault();
+    } catch {
+      // ignore
+    }
+    await openNote(id);
+  });
+
+  btnClearSearch?.addEventListener('click', async () => {
+    if (disposed) return;
+    if (!searchInput.value) return;
+    if (searchDebounceTimer) {
+      try {
+        clearTimeout(searchDebounceTimer);
+      } catch {
+        // ignore
+      }
+      searchDebounceTimer = null;
+    }
+    searchInput.value = '';
+    await refreshNotes();
+    try {
+      searchInput.focus();
+    } catch {
+      // ignore
+    }
   });
 
   titleInput.addEventListener('input', () => {

@@ -107,7 +107,19 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
   const searchInput = document.createElement('input');
   searchInput.className = 'np-input';
   searchInput.type = 'text';
-  searchInput.placeholder = '搜索标题/文件夹（可配合标签）…';
+  searchInput.placeholder = '搜索标题/文件夹/内容…';
+
+  const btnClearSearch = document.createElement('button');
+  btnClearSearch.type = 'button';
+  btnClearSearch.className = 'np-btn np-btn-icon';
+  btnClearSearch.title = '清空搜索';
+  btnClearSearch.setAttribute('aria-label', '清空搜索');
+  btnClearSearch.textContent = '×';
+
+  const searchRow = document.createElement('div');
+  searchRow.className = 'np-row np-row-compact';
+  searchRow.appendChild(searchInput);
+  searchRow.appendChild(btnClearSearch);
 
   const folderSection = document.createElement('div');
   const folderTitle = document.createElement('div');
@@ -135,8 +147,7 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
   tagSection.appendChild(tagTitle);
   tagSection.appendChild(tagRow);
 
-  leftBody.appendChild(searchInput);
-  leftBody.appendChild(tagSection);
+  leftBody.appendChild(searchRow);
   leftBody.appendChild(folderSection);
 
   leftCard.appendChild(leftHeader);
@@ -255,6 +266,7 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
     statusPill,
     createHint,
     searchInput,
+    btnClearSearch,
     folderList,
     tagRow,
     titleInput,

@@ -37,20 +37,30 @@ export async function raceWithAbort(promise, signal) {
   }
 }
 
-export function parseToolArguments(toolName, argsRaw) {
+export function parseToolArguments(toolName, argsRaw, toolParameters) {
   if (!argsRaw || !argsRaw.trim()) {
     return {};
   }
+  const allowedKeys = extractJsonSchemaObjectKeys(toolParameters);
   try {
     return JSON.parse(argsRaw);
   } catch (err) {
     logToolArgumentParseFailure('raw', toolName, argsRaw, err);
-    const repaired = repairJsonString(argsRaw);
+    const repaired = repairJsonString(argsRaw, { allowedKeys });
     if (repaired && repaired !== argsRaw) {
       try {
         return JSON.parse(repaired);
       } catch (err2) {
         logToolArgumentParseFailure('repaired', toolName, repaired, err2);
+        const repairedFallback = repairJsonString(argsRaw);
+        if (repairedFallback && repairedFallback !== repaired && repairedFallback !== argsRaw) {
+          try {
+            return JSON.parse(repairedFallback);
+          } catch (err3) {
+            logToolArgumentParseFailure('repaired-fallback', toolName, repairedFallback, err3);
+            throw new Error(`Failed to parse arguments for tool ${toolName}: ${err3.message}`);
+          }
+        }
         throw new Error(`Failed to parse arguments for tool ${toolName}: ${err2.message}`);
       }
     }
@@ -58,10 +68,11 @@ export function parseToolArguments(toolName, argsRaw) {
   }
 }
 
-export function repairJsonString(input) {
+export function repairJsonString(input, options = {}) {
   if (!input) {
     return input;
   }
+  const allowedKeys = options?.allowedKeys instanceof Set ? options.allowedKeys : null;
   let output = '';
   let inString = false;
   let escaping = false;
@@ -92,7 +103,7 @@ export function repairJsonString(input) {
       if (char === '"') {
         const containerType = contextStack.length > 0 ? contextStack[contextStack.length - 1].type : null;
         const parentType = contextStack.length > 1 ? contextStack[contextStack.length - 2].type : null;
-        if (stringIsKey || looksLikeValueTerminator(input, i, containerType, parentType)) {
+        if (stringIsKey || shouldTerminateValueString(input, i, containerType, parentType, contextStack.length, allowedKeys)) {
           inString = false;
           stringIsKey = false;
           updateObjectKeyState(contextStack, false);
@@ -161,6 +172,24 @@ export function repairJsonString(input) {
   return output;
 }
 
+function extractJsonSchemaObjectKeys(schema) {
+  const out = new Set();
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'object' && node.properties && typeof node.properties === 'object' && !Array.isArray(node.properties)) {
+      Object.keys(node.properties).forEach((k) => out.add(k));
+      return;
+    }
+    const composites = ['oneOf', 'anyOf', 'allOf'];
+    for (const key of composites) {
+      const list = node[key];
+      if (Array.isArray(list)) list.forEach(visit);
+    }
+  };
+  visit(schema);
+  return out.size > 0 ? out : null;
+}
+
 function isValidJsonEscape(char) {
   if (!char) {
     return false;
@@ -192,28 +221,102 @@ function updateObjectKeyState(stack, expecting) {
   }
 }
 
-function looksLikeValueTerminator(source, index, containerType, parentType) {
+function shouldTerminateValueString(source, index, containerType, parentType, depth, allowedKeys) {
   const nextIdx = findNextNonWhitespaceIndex(source, index + 1);
   if (nextIdx === -1) {
     return true;
   }
   const next = source[nextIdx];
-  if (next === ',' || next === ']' || next === '}') {
+  const closesObject = containerType === 'object' && next === '}';
+  const closesArray = containerType === 'array' && next === ']';
+
+  if (closesObject || closesArray) {
+    const afterCloseIdx = findNextNonWhitespaceIndex(source, nextIdx + 1);
+    if (afterCloseIdx === -1) {
+      return true;
+    }
+    if (depth <= 1) {
+      return false;
+    }
+    const afterClose = source[afterCloseIdx];
+    if (afterClose === ',') return true;
+    if (parentType === 'object' && afterClose === '}') return true;
+    if (parentType === 'array' && afterClose === ']') return true;
+    return false;
+  }
+
+  if (next !== ',') return false;
+
+  const afterCommaIdx = findNextNonWhitespaceIndex(source, nextIdx + 1);
+  if (afterCommaIdx === -1) {
     return true;
   }
-  if (containerType === 'object' && next === ':') {
+  const afterComma = source[afterCommaIdx];
+
+  if (containerType === 'object') {
+    if (afterComma === '}' || afterComma === ']') {
+      return false;
+    }
+    if (afterComma !== '"') {
+      return false;
+    }
+    const keyToken = readJsonStringToken(source, afterCommaIdx);
+    if (!keyToken) return false;
+    const colonIdx = findNextNonWhitespaceIndex(source, keyToken.endIndex + 1);
+    if (colonIdx === -1 || source[colonIdx] !== ':') return false;
+
+    if (allowedKeys && depth === 1 && !allowedKeys.has(keyToken.value)) {
+      return false;
+    }
     return true;
   }
-  if (containerType === 'array' && next === ']') {
+
+  if (containerType === 'array') {
+    if (afterComma === ']' || afterComma === '}') {
+      return false;
+    }
     return true;
   }
-  if (parentType === 'array' && next === ']') {
-    return true;
+
+  return true;
+}
+
+function readJsonStringToken(source, startIndex) {
+  const str = typeof source === 'string' ? source : '';
+  if (startIndex < 0 || startIndex >= str.length) return null;
+  if (str[startIndex] !== '"') return null;
+
+  let value = '';
+  let escaping = false;
+  for (let i = startIndex + 1; i < str.length; i += 1) {
+    const char = str[i];
+    if (escaping) {
+      escaping = false;
+      if (char === 'u') {
+        const seq = str.slice(i + 1, i + 5);
+        if (seq.length === 4 && /^[0-9a-fA-F]{4}$/.test(seq)) {
+          try {
+            value += String.fromCharCode(parseInt(seq, 16));
+          } catch {
+            value += `u${seq}`;
+          }
+          i += 4;
+          continue;
+        }
+      }
+      value += char;
+      continue;
+    }
+    if (char === '\\') {
+      escaping = true;
+      continue;
+    }
+    if (char === '"') {
+      return { value, endIndex: i };
+    }
+    value += char;
   }
-  if (parentType === 'object' && next === '}') {
-    return true;
-  }
-  return false;
+  return null;
 }
 
 function findNextNonWhitespaceIndex(source, startIndex) {
@@ -469,4 +572,3 @@ export function normalizeToolCalls(toolCalls) {
   }
   return normalized;
 }
-
