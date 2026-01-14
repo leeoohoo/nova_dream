@@ -1,10 +1,12 @@
 import path from 'path';
 import fs from 'fs';
 import * as colors from '../colors.js';
+import { createLogger } from '../logger.js';
 import { loadMcpConfig } from '../mcp.js';
 import { registerTool } from '../tools/index.js';
 import { performance } from 'perf_hooks';
 import { adjustCommandArgs, parseMcpEndpoint } from './runtime/endpoints.js';
+import { mapAllSettledWithConcurrency, resolveConcurrency } from './runtime/concurrency.js';
 import { allowExternalOnlyMcpServers, isExternalOnlyMcpServerName } from '../../shared/host-app.js';
 import { ensureAppDbPath, resolveAppStateDir } from '../../shared/state-paths.js';
 import {
@@ -22,6 +24,8 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket.js';
 
+const log = createLogger('MCP');
+
 async function initializeMcpRuntime(
   configPath,
   sessionRoot = process.cwd(),
@@ -32,7 +36,7 @@ async function initializeMcpRuntime(
   try {
     ({ servers } = loadMcpConfig(configPath));
   } catch (err) {
-    console.error(colors.yellow(`[MCP] 读取 mcp.config.json 失败：${err.message}`));
+    log.error('读取 mcp.config.json 失败', err);
     return null;
   }
   const extraServers = Array.isArray(options?.extraServers) ? options.extraServers : [];
@@ -60,25 +64,24 @@ async function initializeMcpRuntime(
       ? enabledServers.filter((entry) => !skip.has(String(entry?.name || '').toLowerCase()))
       : enabledServers;
   const baseDir = configPath ? path.dirname(configPath) : process.cwd();
+  const connectTargets = filteredServers.filter((entry) => entry && entry.url);
+  const startupConcurrency = resolveConcurrency(
+    options?.mcpStartupConcurrency ?? process.env.MODEL_CLI_MCP_STARTUP_CONCURRENCY,
+    4
+  );
+  const settled = await mapAllSettledWithConcurrency(connectTargets, startupConcurrency, (entry) =>
+    connectMcpServer(entry, baseDir, sessionRoot, workspaceRoot, options)
+  );
   const handles = [];
-  for (const entry of filteredServers) {
-    if (!entry || !entry.url) {
-      continue;
+  settled.forEach((result, idx) => {
+    const entry = connectTargets[idx];
+    if (!result) return;
+    if (result.status === 'fulfilled') {
+      if (result.value) handles.push(result.value);
+      return;
     }
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const handle = await connectMcpServer(entry, baseDir, sessionRoot, workspaceRoot, options);
-      if (handle) {
-        handles.push(handle);
-      }
-    } catch (err) {
-      console.error(
-        colors.yellow(
-          `[MCP] 无法连接到 ${entry.name || '<unnamed>'}: ${err.message || err}`
-        )
-      );
-    }
-  }
+    log.warn(`无法连接到 ${entry?.name || '<unnamed>'}`, result.reason);
+  });
   if (handles.length === 0) {
     return null;
   }
@@ -277,7 +280,7 @@ async function connectAndRegisterTools({ entry, client, transport, sessionRoot, 
   }
   if (transport && typeof transport === 'object') {
     transport.onclose = () => {
-      console.error(colors.yellow(`[MCP] 连接 ${entry?.name || '<unnamed>'} 已关闭`));
+      log.warn(`连接 ${entry?.name || '<unnamed>'} 已关闭`);
     };
   }
   await client.connect(transport);
@@ -290,7 +293,7 @@ async function connectAndRegisterTools({ entry, client, transport, sessionRoot, 
   });
   const toolsFromServer = await fetchAllTools(client);
   if (toolsFromServer.length === 0) {
-    console.error(colors.yellow(`[MCP] ${entry?.name || '<unnamed>'} 未公开任何工具。`));
+    log.warn(`${entry?.name || '<unnamed>'} 未公开任何工具。`);
   }
   const registeredTools = toolsFromServer
     .map((tool) => registerRemoteTool(client, entry, tool))

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -21,8 +22,15 @@ test('indexClaudeCodeMarketplace reads .claude-plugin marketplace', () => {
   assert.equal(entries[0].source.pluginPath, 'plugins/sample-plugin');
 });
 
-test('importClaudeCodePlugin converts repo plugin to internal format', () => {
-  const outDir = fs.mkdtempSync(path.join(process.cwd(), 'tmp', 'subagents-import-'));
+test('importClaudeCodePlugin converts repo plugin to internal format', (t) => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'subagents-import-'));
+  t.after(() => {
+    try {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+  });
   const result = importClaudeCodePlugin({
     repoRoot: FIXTURE_ROOT,
     pluginId: 'sample-plugin',
@@ -48,8 +56,15 @@ test('importClaudeCodePlugin converts repo plugin to internal format', () => {
   assert.ok(agentPrompt.includes('You are a sample agent.'));
 });
 
-test('SubAgentManager installs marketplace plugin by importing it first', () => {
-  const tmpRoot = fs.mkdtempSync(path.join(process.cwd(), 'tmp', 'subagents-manager-'));
+test('SubAgentManager installs marketplace plugin by importing it first', (t) => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'subagents-manager-'));
+  t.after(() => {
+    try {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+  });
   const builtinRoot = path.join(tmpRoot, 'builtin-subagents');
   fs.mkdirSync(path.join(builtinRoot, 'plugins'), { recursive: true });
   fs.writeFileSync(path.join(builtinRoot, 'marketplace.json'), '[]', 'utf8');
@@ -73,4 +88,3 @@ test('SubAgentManager installs marketplace plugin by importing it first', () => 
     process.env.HOME = previousHome;
   }
 });
-

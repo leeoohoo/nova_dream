@@ -25,6 +25,7 @@
     "start": "node src/cli.js",
     "chat": "node src/cli.js chat",
     "models": "node src/cli.js models",
+    "test": "node --test",
     "engine:build": "node scripts/build-engine.js",
     "validate:defaults": "node scripts/validate-defaults.js",
     "prepack": "node scripts/build-engine.js --skip-if-present && node scripts/build-ui.js --release --skip-if-present && node scripts/build-cli-ui-plugin.js --release --skip-if-present",

@@ -8,6 +8,7 @@ import { ConfigError, createAppConfigFromModels } from './config.js';
 import { ChatSession } from './session.js';
 import { ModelClient } from './client.js';
 import * as colors from './colors.js';
+import { createLogger } from './logger.js';
 import { runStartupWizard } from './ui/index.js';
 import { initializeMcpRuntime } from './mcp/runtime.js';
 import { loadPromptProfilesFromDb, loadSystemPromptFromDb, composeSystemPrompt, buildUserPromptMessages } from './prompts.js';
@@ -30,6 +31,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEFAULT_MODEL_NAME = 'deepseek_chat';
+const log = createLogger();
+const mcpLog = createLogger('MCP');
 
 const COMMANDS = {
   MODELS: 'models',
@@ -41,7 +44,7 @@ if (!process.env.MODEL_CLI_HOST_APP) {
 }
 
 main().catch((err) => {
-  console.error(colors.yellow(`Unexpected failure: ${err.message}`));
+  log.error('Unexpected failure', err);
   process.exitCode = 1;
 });
 
@@ -373,7 +376,7 @@ async function runChat(options) {
       mcpRuntime.applyToConfig(config);
     }
   } catch (err) {
-    console.error(colors.yellow(`[MCP] 初始化失败：${err.message}`));
+    mcpLog.error('初始化失败', err);
   }
   const client = new ModelClient(config);
   const targetSettings = config.getModel(resolvedOptions.model || null);
