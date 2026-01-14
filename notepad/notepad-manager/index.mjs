@@ -17,10 +17,13 @@ export function mount({ container, host, slots }) {
   const api = createNotesApi({ host, bridgeEnabled });
 
   const {
+    root,
     btnNewFolder,
     btnNewNote,
     btnSave,
     btnDelete,
+    btnCopy,
+    btnToggleEdit,
     createHint,
     searchInput,
     folderList,
@@ -50,6 +53,9 @@ export function mount({ container, host, slots }) {
   let currentContent = '';
   let dirty = false;
   let controlsEnabled = false;
+  let editorMode = 'preview';
+  let copying = false;
+  let copyFeedbackTimer = null;
   let activeTreeKey = '';
   const NOTE_KEY_PREFIX = '__note__:';
   const noteIndex = new Map();
@@ -80,17 +86,83 @@ export function mount({ container, host, slots }) {
     return { kind: 'folder', folder: parts.join('/') };
   };
 
+  const clearCopyFeedbackTimer = () => {
+    if (!copyFeedbackTimer) return;
+    try {
+      clearTimeout(copyFeedbackTimer);
+    } catch {
+      // ignore
+    }
+    copyFeedbackTimer = null;
+  };
+
+  const flashCopyFeedback = (text) => {
+    if (!btnCopy) return;
+    const original = '复制';
+    btnCopy.textContent = text;
+    clearCopyFeedbackTimer();
+    copyFeedbackTimer = setTimeout(() => {
+      copyFeedbackTimer = null;
+      btnCopy.textContent = original;
+    }, 1000);
+  };
+
+  const syncEditorControls = () => {
+    const hasNote = Boolean(currentNote);
+    const editable = controlsEnabled && hasNote && editorMode === 'edit';
+
+    setButtonEnabled(btnSave, editable);
+    setButtonEnabled(btnDelete, controlsEnabled && hasNote);
+    setButtonEnabled(btnCopy, controlsEnabled && hasNote && !copying);
+    setButtonEnabled(btnToggleEdit, controlsEnabled && hasNote);
+
+    titleInput.disabled = !editable;
+    folderSelect.disabled = !editable;
+    tagsInput.disabled = !editable;
+    textarea.disabled = !editable;
+  };
+
+  const setEditorMode = (mode, { focus } = {}) => {
+    editorMode = mode === 'edit' ? 'edit' : 'preview';
+    if (root) root.dataset.editorMode = editorMode;
+    if (btnToggleEdit) btnToggleEdit.textContent = editorMode === 'edit' ? '预览' : '编辑';
+    syncEditorControls();
+    if (focus && editorMode === 'edit') {
+      try {
+        textarea.focus();
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const copyPlainText = async (text) => {
+    const value = typeof text === 'string' ? text : String(text ?? '');
+    if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const el = document.createElement('textarea');
+    el.value = value;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.top = '-1000px';
+    el.style.left = '-1000px';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.select();
+    el.setSelectionRange(0, el.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(el);
+    if (!ok) throw new Error('copy failed');
+  };
+
   const setControlsEnabled = (enabled) => {
     controlsEnabled = enabled;
     setButtonEnabled(btnNewFolder, enabled);
     setButtonEnabled(btnNewNote, enabled);
-    setButtonEnabled(btnSave, enabled && Boolean(currentNote));
-    setButtonEnabled(btnDelete, enabled && Boolean(currentNote));
     searchInput.disabled = !enabled;
-    titleInput.disabled = !enabled;
-    folderSelect.disabled = !enabled;
-    tagsInput.disabled = !enabled;
-    textarea.disabled = !enabled;
+    syncEditorControls();
   };
 
   const updateCreateHint = () => {
@@ -545,8 +617,7 @@ export function mount({ container, host, slots }) {
       tagsInput.value = '';
       textarea.value = '';
       preview.innerHTML = '<div class="np-meta">预览区</div>';
-      setButtonEnabled(btnSave, false);
-      setButtonEnabled(btnDelete, false);
+      setEditorMode('preview');
       return;
     }
     infoBox.textContent = dirty ? `未保存 · ${currentNote.updatedAt || ''}` : `${currentNote.updatedAt || ''}`;
@@ -555,8 +626,7 @@ export function mount({ container, host, slots }) {
     if (force || document.activeElement !== tagsInput) tagsInput.value = tagsToText(currentNote.tags);
     if (force || document.activeElement !== textarea) textarea.value = currentContent;
     preview.innerHTML = renderMarkdown(currentContent);
-    setButtonEnabled(btnSave, controlsEnabled);
-    setButtonEnabled(btnDelete, controlsEnabled);
+    syncEditorControls();
   };
 
   const refreshFoldersAndTags = async () => {
@@ -636,6 +706,7 @@ export function mount({ container, host, slots }) {
     currentNote = res.note || null;
     currentContent = String(res.content ?? '');
     dirty = false;
+    setEditorMode('preview');
     activeTreeKey = makeNoteKey(res.note?.folder, id);
     if (currentNote) noteIndex.set(id, currentNote);
     renderFolderList();
@@ -771,6 +842,24 @@ export function mount({ container, host, slots }) {
 
   btnSave.addEventListener('click', () => doSave());
   btnDelete.addEventListener('click', () => doDelete());
+  btnToggleEdit.addEventListener('click', () => {
+    if (disposed || !currentNote) return;
+    setEditorMode(editorMode === 'edit' ? 'preview' : 'edit', { focus: true });
+  });
+  btnCopy.addEventListener('click', async () => {
+    if (disposed || !currentNote || copying) return;
+    copying = true;
+    syncEditorControls();
+    try {
+      await copyPlainText(currentContent || '');
+      flashCopyFeedback('已复制');
+    } catch {
+      flashCopyFeedback('复制失败');
+    } finally {
+      copying = false;
+      syncEditorControls();
+    }
+  });
 
   searchInput.addEventListener('input', async () => {
     if (disposed) return;
@@ -843,6 +932,7 @@ export function mount({ container, host, slots }) {
 
   return () => {
     disposed = true;
+    clearCopyFeedbackTimer();
     if (searchDebounceTimer) {
       try {
         clearTimeout(searchDebounceTimer);

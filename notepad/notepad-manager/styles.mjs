@@ -214,6 +214,12 @@ ${DS_TREE_STYLES}
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
+    .np-root[data-editor-mode='preview'] .np-textarea {
+      display: none;
+    }
+    .np-root[data-editor-mode='preview'] .np-editor-split {
+      grid-template-columns: 1fr;
+    }
     .np-preview {
       border: 1px solid var(--ds-code-border);
       background: var(--ds-code-bg);
@@ -347,4 +353,3 @@ ${DS_TREE_STYLES}
     .np-btn[data-variant='danger'] { border-color: rgba(248, 81, 73, 0.5); }
     .np-btn[data-variant='danger']:hover { box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.24); }
 `;
-

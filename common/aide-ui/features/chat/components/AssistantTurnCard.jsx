@@ -1,10 +1,34 @@
-import React, { useMemo } from 'react';
-import { Collapse, Space, Tag, Typography } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Button, Collapse, Space, Tag, Typography, message } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 
 import { MarkdownBlock } from '../../../components/MarkdownBlock.jsx';
 import { PopoverTag } from './PopoverTag.jsx';
 
 const { Text } = Typography;
+
+async function copyPlainText(text) {
+  const value = typeof text === 'string' ? text : String(text ?? '');
+  if (!value) return;
+  if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  if (typeof document === 'undefined') throw new Error('Clipboard API not available');
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '-1000px';
+  textarea.style.left = '-1000px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  const ok = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!ok) throw new Error('copy failed');
+}
 
 function normalizeId(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -42,6 +66,7 @@ function getToolResultText(results = []) {
 
 export function AssistantTurnCard({ messages, streaming }) {
   const list = useMemo(() => (Array.isArray(messages) ? messages.filter(Boolean) : []), [messages]);
+  const [copying, setCopying] = useState(false);
   const createdAt = useMemo(() => {
     const first = list.find((m) => m?.createdAt);
     return first?.createdAt || '';
@@ -149,23 +174,52 @@ export function AssistantTurnCard({ messages, streaming }) {
       list.some((m) => normalizeId(m?.id) === normalizeId(streaming.messageId))
   );
 
+  const copyText = useMemo(() => {
+    const parts = blocks
+      .filter((b) => b?.type === 'assistant')
+      .map((b) => (typeof b?.content === 'string' ? b.content : String(b?.content || '')))
+      .map((text) => text.trim())
+      .filter(Boolean);
+    return parts.join('\n\n');
+  }, [blocks]);
+
+  const onCopy = async () => {
+    if (!copyText || copying) return;
+    setCopying(true);
+    try {
+      await copyPlainText(copyText);
+      message.success('已复制');
+    } catch (err) {
+      message.error(err?.message || '复制失败');
+    } finally {
+      setCopying(false);
+    }
+  };
+
   return (
     <div style={{ width: '100%', padding: '4px 0' }}>
-      <Space size={8} wrap>
-        <Tag color="green" style={{ marginRight: 0 }}>
-          AI
-        </Tag>
-        {timeText ? (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {timeText}
-          </Text>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Space size={8} wrap>
+          <Tag color="green" style={{ marginRight: 0 }}>
+            AI
+          </Tag>
+          {timeText ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {timeText}
+            </Text>
+          ) : null}
+          {isStreaming ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              （输出中…）
+            </Text>
+          ) : null}
+        </Space>
+        {copyText ? (
+          <Button size="small" type="text" icon={<CopyOutlined />} onClick={onCopy} loading={copying}>
+            复制
+          </Button>
         ) : null}
-        {isStreaming ? (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            （输出中…）
-          </Text>
-        ) : null}
-      </Space>
+      </div>
 
       <div style={{ marginTop: 6 }}>
         {hasBlocks ? (

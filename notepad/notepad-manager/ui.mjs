@@ -11,6 +11,7 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
 
   const root = document.createElement('div');
   root.className = 'np-root';
+  root.dataset.editorMode = 'preview';
   root.appendChild(style);
 
   const header = document.createElement('div');
@@ -65,6 +66,18 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
   btnDelete.type = 'button';
   btnDelete.className = 'np-btn';
   btnDelete.textContent = '删除';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.type = 'button';
+  btnCopy.className = 'np-btn';
+  btnCopy.textContent = '复制';
+  btnCopy.title = '复制当前笔记内容';
+
+  const btnToggleEdit = document.createElement('button');
+  btnToggleEdit.type = 'button';
+  btnToggleEdit.className = 'np-btn';
+  btnToggleEdit.textContent = '编辑';
+  btnToggleEdit.title = '切换编辑/预览';
 
   const statusPill = document.createElement('div');
   statusPill.className = 'np-pill';
@@ -138,6 +151,8 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
   rightHeaderTitle.textContent = '编辑与预览';
   const rightHeaderActions = document.createElement('div');
   rightHeaderActions.className = 'np-row';
+  rightHeaderActions.appendChild(btnToggleEdit);
+  rightHeaderActions.appendChild(btnCopy);
   rightHeaderActions.appendChild(btnSave);
   rightHeaderActions.appendChild(btnDelete);
   rightHeader.appendChild(rightHeaderTitle);
@@ -235,6 +250,8 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
     btnNewNote,
     btnSave,
     btnDelete,
+    btnCopy,
+    btnToggleEdit,
     statusPill,
     createHint,
     searchInput,
@@ -249,4 +266,3 @@ export function createNotepadManagerUi({ container, slots, ctx, bridgeEnabled })
     setStatus,
   };
 }
-
