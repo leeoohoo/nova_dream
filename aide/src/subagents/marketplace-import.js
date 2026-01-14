@@ -4,10 +4,11 @@ import YAML from 'yaml';
 
 function parseFrontmatter(content) {
   const raw = typeof content === 'string' ? content : '';
-  if (!raw.startsWith('---')) {
+  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!normalized.startsWith('---')) {
     return { data: {}, body: raw };
   }
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) {
     return { data: {}, body: raw };
   }

@@ -186,12 +186,14 @@ function parsePluginDocs(mdPath) {
 }
 
 function parseFrontmatter(content) {
-  if (!content.startsWith('---')) {
-    return { data: {}, body: content };
+  const raw = typeof content === 'string' ? content : '';
+  const normalized = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!normalized.startsWith('---')) {
+    return { data: {}, body: raw };
   }
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) {
-    return { data: {}, body: content };
+    return { data: {}, body: raw };
   }
   const data = YAML.parse(match[1]) || {};
   return { data, body: match[2] || '' };

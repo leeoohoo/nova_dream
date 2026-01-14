@@ -2,6 +2,7 @@
   "name": "@leeoohoo/chatos",
   "version": "0.1.1",
   "description": "Terminal chat client for multiple AI models (Node.js implementation).",
+  "license": "MIT",
   "bin": {
     "chatos": "src/cli.js",
     "chatosui": "bin/chatosui.js"
@@ -27,6 +28,7 @@
   ],
   "scripts": {
     "start": "node src/cli.js",
+    "test": "node --test",
     "ui:build": "node scripts/build-ui.js",
     "ui:build:release": "node scripts/build-ui.js --release",
     "uiapps:embed": "node scripts/embed-git-ui-app.js && node scripts/embed-wsl-ui-app.js && node scripts/embed-notepad-ui-app.js",

@@ -4,6 +4,9 @@
   "description": "ChatOS UI Apps DevKit (CLI + templates + sandbox) for building installable ChatOS UI Apps plugins.",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "bin": {
     "chatos-uiapp": "bin/chatos-uiapp.js"
   },

@@ -2,6 +2,7 @@
   "name": "@leeoohoo/aide",
   "version": "0.1.1",
   "description": "Terminal chat client for multiple AI models (CLI + Electron UI).",
+  "license": "MIT",
   "bin": {
     "aide": "dist/cli.js",
     "aideui": "bin/aideui.js"

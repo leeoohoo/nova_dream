@@ -2,7 +2,11 @@
   "name": "@leeoohoo/common",
   "version": "0.1.1",
   "description": "Shared runtime utilities and UI components for ChatOS/AIDE.",
+  "license": "MIT",
   "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
   "dependencies": {
     "sql.js": "^1.12.0",
     "yaml": "^2.7.0",
