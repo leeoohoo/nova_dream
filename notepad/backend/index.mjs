@@ -1,6 +1,5 @@
-import os from 'os';
-import path from 'path';
 import { createNotepadStore } from '../shared/notepad-store.mjs';
+import { resolveUiAppDataDir } from '../shared/notepad-paths.mjs';
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -8,12 +7,7 @@ function normalizeString(value) {
 
 function resolveFallbackDataDir(ctx) {
   const pluginId = normalizeString(ctx?.pluginId) || 'com.leeoohoo.notepad';
-  const hostApp = normalizeString(process.env.MODEL_CLI_HOST_APP) || 'chatos';
-  const home = os.homedir();
-  const stateDir = home
-    ? path.join(home, '.deepseek_cli', hostApp)
-    : path.join(path.resolve(process.env.MODEL_CLI_SESSION_ROOT || process.cwd()), '.deepseek_cli', hostApp);
-  return path.join(stateDir, 'ui_apps', 'data', pluginId);
+  return resolveUiAppDataDir({ pluginId });
 }
 
 export async function createUiAppsBackend(ctx) {

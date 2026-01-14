@@ -53,6 +53,10 @@ export function mount({ container, host, slots }) {
   let activeTreeKey = '';
   const NOTE_KEY_PREFIX = '__note__:';
   const noteIndex = new Map();
+  let refreshFoldersSeq = 0;
+  let refreshNotesSeq = 0;
+  let openNoteSeq = 0;
+  let searchDebounceTimer = null;
 
   const makeNoteKey = (folder, id) => {
     const noteId = normalizeString(id);
@@ -428,18 +432,26 @@ export function mount({ container, host, slots }) {
       const parsed = parseTreeKey(key);
       if (parsed.kind === 'note') {
         const noteId = parsed.noteId;
-        if (!noteId || noteId === selectedNoteId) return;
-        activeTreeKey = key;
+        if (!noteId) return;
+        if (noteId === selectedNoteId) {
+          if (activeTreeKey !== key) {
+            activeTreeKey = key;
+            renderFolderList();
+          }
+          return;
+        }
         if (!(await ensureSafeToSwitch())) return;
         if (selectedFolder !== parsed.folder) {
           selectedFolder = parsed.folder;
           updateCreateHint();
         }
+        activeTreeKey = key;
+        renderFolderList();
         await openNote(noteId);
         return;
       }
       const folder = parsed.folder;
-      if (folder === selectedFolder) return;
+      if (folder === selectedFolder && activeTreeKey === folder) return;
       activeTreeKey = folder;
       selectedFolder = folder;
       updateCreateHint();
@@ -473,11 +485,16 @@ export function mount({ container, host, slots }) {
 
   const renderFolderList = () => {
     const paths = Array.isArray(folders) ? [...folders] : [];
+    const currentId = normalizeString(currentNote?.id);
     (Array.isArray(notes) ? notes : []).forEach((n) => {
       const id = normalizeString(n?.id);
       if (!id) return;
+      if (currentId && id === currentId) return;
       paths.push(makeNoteKey(n?.folder, id));
     });
+    if (currentId) {
+      paths.push(makeNoteKey(normalizeString(currentNote?.folder) || selectedFolder, currentId));
+    }
 
     const fallbackKey = selectedNoteId
       ? makeNoteKey(normalizeString(currentNote?.folder) || selectedFolder, selectedNoteId)
@@ -543,7 +560,18 @@ export function mount({ container, host, slots }) {
   };
 
   const refreshFoldersAndTags = async () => {
-    const [folderRes, tagRes] = await Promise.all([api.listFolders(), api.listTags()]);
+    const seq = (refreshFoldersSeq += 1);
+    let folderRes = null;
+    let tagRes = null;
+    try {
+      [folderRes, tagRes] = await Promise.all([api.listFolders(), api.listTags()]);
+    } catch (err) {
+      if (disposed || seq !== refreshFoldersSeq) return;
+      setStatus(`Notes: ${err?.message || String(err)}`, 'bad');
+      return;
+    }
+    if (disposed || seq !== refreshFoldersSeq) return;
+
     folders = Array.isArray(folderRes?.folders) ? folderRes.folders : [''];
     if (!folders.includes('')) folders.unshift('');
     tags = Array.isArray(tagRes?.tags) ? tagRes.tags : [];
@@ -553,51 +581,66 @@ export function mount({ container, host, slots }) {
   };
 
   const refreshNotes = async () => {
+    const seq = (refreshNotesSeq += 1);
     const query = normalizeString(searchInput.value);
-    const res = await api.listNotes({
-      folder: '',
-      recursive: true,
-      tags: selectedTags,
-      match: 'all',
-      query,
-      limit: 500,
-    });
-    notes = Array.isArray(res?.notes) ? res.notes : [];
+    let res = null;
+    try {
+      res = await api.listNotes({
+        folder: '',
+        recursive: true,
+        tags: selectedTags,
+        match: 'all',
+        query,
+        limit: 500,
+      });
+    } catch (err) {
+      if (disposed || seq !== refreshNotesSeq) return;
+      setStatus(`Notes: ${err?.message || String(err)}`, 'bad');
+      return;
+    }
+    if (disposed || seq !== refreshNotesSeq) return;
+
+    if (!res?.ok) {
+      notes = [];
+      setStatus(`Notes: ${res?.message || 'list notes failed'}`, 'bad');
+    } else {
+      notes = Array.isArray(res?.notes) ? res.notes : [];
+    }
     noteIndex.clear();
     notes.forEach((n) => {
       const id = normalizeString(n?.id);
       if (!id) return;
       noteIndex.set(id, n);
     });
-    if (selectedNoteId && !notes.some((n) => n.id === selectedNoteId)) {
-      selectedNoteId = '';
-      currentNote = null;
-      currentContent = '';
-      dirty = false;
-      renderEditor(true);
-    }
+    const currentId = normalizeString(currentNote?.id);
+    if (currentId && currentNote) noteIndex.set(currentId, currentNote);
     renderFolderList();
   };
 
   const openNote = async (id) => {
+    const seq = (openNoteSeq += 1);
     let res = null;
     try {
       res = await api.getNote({ id });
     } catch (err) {
+      if (disposed || seq !== openNoteSeq) return false;
       setStatus(`Notes: ${err?.message || String(err)}`, 'bad');
-      return;
+      return false;
     }
+    if (disposed || seq !== openNoteSeq) return false;
     if (!res?.ok) {
       setStatus(`Notes: ${res?.message || 'load failed'}`, 'bad');
-      return;
+      return false;
     }
     selectedNoteId = id;
     currentNote = res.note || null;
     currentContent = String(res.content ?? '');
     dirty = false;
     activeTreeKey = makeNoteKey(res.note?.folder, id);
+    if (currentNote) noteIndex.set(id, currentNote);
     renderFolderList();
     renderEditor(true);
+    return true;
   };
 
   const doSave = async () => {
@@ -731,7 +774,17 @@ export function mount({ container, host, slots }) {
 
   searchInput.addEventListener('input', async () => {
     if (disposed) return;
-    await refreshNotes();
+    if (searchDebounceTimer) {
+      try {
+        clearTimeout(searchDebounceTimer);
+      } catch {
+        // ignore
+      }
+    }
+    searchDebounceTimer = setTimeout(() => {
+      searchDebounceTimer = null;
+      refreshNotes();
+    }, 180);
   });
 
   titleInput.addEventListener('input', () => {
@@ -790,6 +843,14 @@ export function mount({ container, host, slots }) {
 
   return () => {
     disposed = true;
+    if (searchDebounceTimer) {
+      try {
+        clearTimeout(searchDebounceTimer);
+      } catch {
+        // ignore
+      }
+      searchDebounceTimer = null;
+    }
     closeActiveLayer();
   };
 }

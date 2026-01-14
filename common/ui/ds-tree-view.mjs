@@ -81,6 +81,18 @@ export function createDsPathTreeView({
   const handleSelect = typeof onSelect === 'function' ? onSelect : null;
   const handleContextMenu = typeof onContextMenu === 'function' ? onContextMenu : null;
 
+  const runHandler = (handler, ...args) => {
+    if (typeof handler !== 'function') return;
+    try {
+      const out = handler(...args);
+      if (out && typeof out.then === 'function') {
+        out.catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   let currentPaths = [];
   let currentSelectedKey = '';
   let expandedKeys = new Set(
@@ -233,7 +245,7 @@ export function createDsPathTreeView({
       row.appendChild(labelEl);
 
       row.addEventListener('click', () => {
-        handleSelect?.(key);
+        runHandler(handleSelect, key);
       });
       row.addEventListener('dblclick', () => {
         if (!hasChildren) return;
@@ -247,7 +259,7 @@ export function createDsPathTreeView({
         } catch {
           // ignore
         }
-        handleContextMenu(ev, key);
+        runHandler(handleContextMenu, ev, key);
       });
       row.addEventListener('keydown', (ev) => {
         const k = ev?.key;
@@ -258,7 +270,7 @@ export function createDsPathTreeView({
           } catch {
             // ignore
           }
-          handleSelect?.(key);
+          runHandler(handleSelect, key);
           return;
         }
         if (k === ' ' || k === 'Spacebar') {

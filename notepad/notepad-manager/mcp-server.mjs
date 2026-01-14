@@ -1,30 +1,13 @@
-import os from 'os';
-import path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { createNotepadStore } from '../shared/notepad-store.mjs';
+import { resolveUiAppDataDir } from '../shared/notepad-paths.mjs';
 
 const PLUGIN_ID = 'com.leeoohoo.notepad';
 const SERVER_NAME = 'com.leeoohoo.notepad.manager';
 
-function normalizeString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function resolveStateDir() {
-  const hostApp = normalizeString(process.env.MODEL_CLI_HOST_APP) || 'chatos';
-  const home = os.homedir();
-  if (home) return path.join(home, '.deepseek_cli', hostApp);
-  const sessionRoot = normalizeString(process.env.MODEL_CLI_SESSION_ROOT) || process.cwd();
-  return path.join(path.resolve(sessionRoot), '.deepseek_cli', hostApp);
-}
-
-function resolveDataDir() {
-  return path.join(resolveStateDir(), 'ui_apps', 'data', PLUGIN_ID);
-}
-
-const store = createNotepadStore({ dataDir: resolveDataDir() });
+const store = createNotepadStore({ dataDir: resolveUiAppDataDir({ pluginId: PLUGIN_ID }) });
 
 const server = new McpServer({
   name: SERVER_NAME,
@@ -201,7 +184,11 @@ server.registerTool(
 );
 
 async function main() {
-  await store.init();
+  const initRes = await store.init();
+  if (!initRes?.ok) {
+    // eslint-disable-next-line no-console
+    console.error('Notepad MCP init failed:', initRes?.message || initRes);
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
