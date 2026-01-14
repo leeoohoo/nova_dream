@@ -1,5 +1,5 @@
 {
-  "name": "@chatos/ui-apps-devkit",
+  "name": "@leeoohoo/ui-apps-devkit",
   "version": "0.1.0",
   "description": "ChatOS UI Apps DevKit (CLI + templates + sandbox) for building installable ChatOS UI Apps plugins.",
   "license": "MIT",
@@ -15,6 +15,8 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
-

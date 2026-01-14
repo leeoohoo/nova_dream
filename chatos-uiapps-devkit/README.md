@@ -10,13 +10,13 @@
 ## 安装
 
 ```bash
-npm i -g @chatos/ui-apps-devkit
+npm i -g @leeoohoo/ui-apps-devkit
 ```
 
 或直接用 npx：
 
 ```bash
-npx @chatos/ui-apps-devkit chatos-uiapp --help
+npx @leeoohoo/ui-apps-devkit chatos-uiapp --help
 ```
 
 ## 快速开始

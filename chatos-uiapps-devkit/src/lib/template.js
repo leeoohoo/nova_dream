@@ -17,6 +17,18 @@ export function getTemplateDir(name) {
   return dir;
 }
 
+function readSelfPackage() {
+  const root = packageRoot();
+  const pkgPath = path.join(root, 'package.json');
+  if (!isFile(pkgPath)) return { name: '@leeoohoo/ui-apps-devkit', version: '0.1.0' };
+  try {
+    const pkg = readJson(pkgPath);
+    return pkg && typeof pkg === 'object' ? pkg : { name: '@leeoohoo/ui-apps-devkit', version: '0.1.0' };
+  } catch {
+    return { name: '@leeoohoo/ui-apps-devkit', version: '0.1.0' };
+  }
+}
+
 export function readTemplateMeta(name) {
   const dir = getTemplateDir(name);
   const metaPath = path.join(dir, 'template.json');
@@ -100,6 +112,11 @@ export function writeScaffoldManifest({ destPluginDir, pluginId, pluginName, ver
 }
 
 export function writeScaffoldPackageJson({ destDir, projectName }) {
+  const selfPkg = readSelfPackage();
+  const devkitName = typeof selfPkg?.name === 'string' && selfPkg.name.trim() ? selfPkg.name.trim() : '@leeoohoo/ui-apps-devkit';
+  const devkitVersion = typeof selfPkg?.version === 'string' && selfPkg.version.trim() ? selfPkg.version.trim() : '0.1.0';
+  const devkitRange = `^${devkitVersion}`;
+
   const baseScripts = {
     dev: 'chatos-uiapp dev',
     validate: 'chatos-uiapp validate',
@@ -121,8 +138,8 @@ export function writeScaffoldPackageJson({ destDir, projectName }) {
   }
 
   pkg.devDependencies = pkg.devDependencies && typeof pkg.devDependencies === 'object' ? pkg.devDependencies : {};
-  if (!pkg.devDependencies['@chatos/ui-apps-devkit']) {
-    pkg.devDependencies['@chatos/ui-apps-devkit'] = '^0.1.0';
+  if (!pkg.devDependencies[devkitName]) {
+    pkg.devDependencies[devkitName] = devkitRange;
   }
 
   writeJson(pkgPath, pkg);
