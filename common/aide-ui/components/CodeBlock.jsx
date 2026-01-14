@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import hljs from 'highlight.js';
-import { Button, Space, Typography } from 'antd';
+import { Button, Space, Typography, message } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+
+import { copyPlainText } from '../lib/clipboard.js';
 
 const { Text } = Typography;
 
@@ -47,6 +50,7 @@ export function CodeBlock({
 }) {
   const [expanded, setExpanded] = useState(alwaysExpanded);
   const [forceHighlight, setForceHighlight] = useState(false);
+  const [copying, setCopying] = useState(false);
   useEffect(() => {
     setExpanded(alwaysExpanded);
   }, [alwaysExpanded]);
@@ -65,7 +69,7 @@ export function CodeBlock({
     [highlightEnabled, content, language]
   );
   const useHighlight = Boolean(highlightEnabled && highlightedHtml);
-  const showFooterActions = (highlightTooLarge && highlight && !forceHighlight) || (tooLong && !alwaysExpanded);
+  const showFooterActions = true;
 
   const effectiveWrap = showLineNumbers ? false : wrap;
   const heightConstrained = limited || constrainHeight;
@@ -93,6 +97,19 @@ export function CodeBlock({
     const width = String(count).length;
     return Array.from({ length: count }, (_, idx) => String(idx + 1).padStart(width, ' ')).join('\n');
   }, [showLineNumbers, lineCount]);
+
+  const onCopy = async () => {
+    if (copying) return;
+    setCopying(true);
+    try {
+      await copyPlainText(content);
+      message.success('已复制');
+    } catch (err) {
+      message.error(err?.message || '复制失败');
+    } finally {
+      setCopying(false);
+    }
+  };
 
   return (
     <Space direction="vertical" size={4} style={{ width: '100%' }}>
@@ -164,6 +181,9 @@ export function CodeBlock({
       )}
       {showFooterActions ? (
         <Space size={8} wrap>
+          <Button type="link" size="small" icon={<CopyOutlined />} onClick={onCopy} loading={copying}>
+            复制代码
+          </Button>
           {highlightTooLarge && highlight && !forceHighlight ? (
             <Button type="link" size="small" onClick={() => setForceHighlight(true)}>
               内容较大，启用高亮

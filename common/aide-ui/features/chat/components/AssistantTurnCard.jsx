@@ -4,31 +4,9 @@ import { CopyOutlined } from '@ant-design/icons';
 
 import { MarkdownBlock } from '../../../components/MarkdownBlock.jsx';
 import { PopoverTag } from './PopoverTag.jsx';
+import { copyPlainText } from '../../../lib/clipboard.js';
 
 const { Text } = Typography;
-
-async function copyPlainText(text) {
-  const value = typeof text === 'string' ? text : String(text ?? '');
-  if (!value) return;
-  if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  if (typeof document === 'undefined') throw new Error('Clipboard API not available');
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.top = '-1000px';
-  textarea.style.left = '-1000px';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, textarea.value.length);
-  const ok = document.execCommand('copy');
-  document.body.removeChild(textarea);
-  if (!ok) throw new Error('copy failed');
-}
 
 function normalizeId(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -198,35 +176,28 @@ export function AssistantTurnCard({ messages, streaming }) {
 
   return (
     <div style={{ width: '100%', padding: '4px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Space size={8} wrap>
-          <Tag color="green" style={{ marginRight: 0 }}>
-            AI
-          </Tag>
-          {timeText ? (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {timeText}
-            </Text>
-          ) : null}
-          {isStreaming ? (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              （输出中…）
-            </Text>
-          ) : null}
-        </Space>
-        {copyText ? (
-          <Button size="small" type="text" icon={<CopyOutlined />} onClick={onCopy} loading={copying}>
-            复制
-          </Button>
+      <Space size={8} wrap>
+        <Tag color="green" style={{ marginRight: 0 }}>
+          AI
+        </Tag>
+        {timeText ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {timeText}
+          </Text>
         ) : null}
-      </div>
+        {isStreaming ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            （输出中…）
+          </Text>
+        ) : null}
+      </Space>
 
       <div style={{ marginTop: 6 }}>
         {hasBlocks ? (
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             {blocks.map((block) => {
               if (block.type === 'assistant') {
-                return <MarkdownBlock key={block.key} text={block.content} alwaysExpanded container={false} />;
+                return <MarkdownBlock key={block.key} text={block.content} alwaysExpanded container={false} copyable />;
               }
 
               if (block.type === 'assistant_reasoning') {
@@ -253,7 +224,7 @@ export function AssistantTurnCard({ messages, streaming }) {
                           </Space>
                         ),
                         children: (
-                          <MarkdownBlock text={reasoningText} maxHeight={240} alwaysExpanded container={false} />
+                          <MarkdownBlock text={reasoningText} maxHeight={240} alwaysExpanded container={false} copyable />
                         ),
                       },
                     ]}
@@ -288,7 +259,7 @@ export function AssistantTurnCard({ messages, streaming }) {
                             ) : null}
                             <Text type="secondary">结果</Text>
                             {resultText ? (
-                              <MarkdownBlock text={resultText} maxHeight={320} container={false} />
+                              <MarkdownBlock text={resultText} maxHeight={320} container={false} copyable />
                             ) : (
                               <Text type="secondary">（暂无结果）</Text>
                             )}
@@ -315,7 +286,7 @@ export function AssistantTurnCard({ messages, streaming }) {
                           <div>
                             <Text type="secondary">结果</Text>
                             {content ? (
-                              <MarkdownBlock text={content} maxHeight={320} alwaysExpanded container={false} />
+                              <MarkdownBlock text={content} maxHeight={320} alwaysExpanded container={false} copyable />
                             ) : (
                               <Text type="secondary">（空）</Text>
                             )}
@@ -334,6 +305,14 @@ export function AssistantTurnCard({ messages, streaming }) {
           <Text type="secondary">（无内容）</Text>
         )}
       </div>
+
+      {copyText ? (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+          <Button size="small" type="text" icon={<CopyOutlined />} onClick={onCopy} loading={copying}>
+            复制全部
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

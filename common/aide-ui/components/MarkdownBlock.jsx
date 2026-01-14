@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Space, Typography } from 'antd';
+import { Button, Space, Typography, message } from 'antd';
 import mermaid from 'mermaid';
+import { CopyOutlined } from '@ant-design/icons';
 
 import { CodeBlock } from './CodeBlock.jsx';
+import { copyPlainText } from '../lib/clipboard.js';
 
 const { Text } = Typography;
 
@@ -601,12 +603,11 @@ function renderInlineWithBreaks(text) {
   ));
 }
 
-function renderBlock(block, idx) {
+function renderBlockContent(block) {
   if (!block) return null;
   if (block.type === 'hr') {
     return (
       <hr
-        key={idx}
         style={{
           border: 'none',
           borderTop: '1px solid var(--ds-panel-border)',
@@ -619,11 +620,10 @@ function renderBlock(block, idx) {
     const lang = block.language ? String(block.language).trim() : '';
     const normalized = lang.toLowerCase();
     if (normalized === 'mermaid' || normalized === 'mmd' || (!normalized && looksLikeMermaid(block.text))) {
-      return <MermaidDiagram key={idx} text={block.text} />;
+      return <MermaidDiagram text={block.text} />;
     }
     return (
       <CodeBlock
-        key={idx}
         text={block.text}
         maxHeight={320}
         highlight
@@ -635,13 +635,13 @@ function renderBlock(block, idx) {
     );
   }
   if (block.type === 'mermaid') {
-    return <MermaidDiagram key={idx} text={block.text} />;
+    return <MermaidDiagram text={block.text} />;
   }
   if (block.type === 'heading') {
     const level = Math.min(Math.max(Number(block.level) || 1, 1), 6);
     const fontSize = level === 1 ? 16 : level === 2 ? 15 : level === 3 ? 14 : 13;
     return (
-      <div key={idx} style={{ fontWeight: 600, fontSize, margin: '6px 0 2px' }}>
+      <div style={{ fontWeight: 600, fontSize, margin: '6px 0 2px' }}>
         {renderInlineNodes(block.text)}
       </div>
     );
@@ -649,7 +649,6 @@ function renderBlock(block, idx) {
   if (block.type === 'blockquote') {
     return (
       <div
-        key={idx}
         style={{
           borderLeft: '3px solid var(--ds-blockquote-border)',
           paddingLeft: 10,
@@ -664,7 +663,7 @@ function renderBlock(block, idx) {
   if (block.type === 'ul' || block.type === 'ol') {
     const ListTag = block.type === 'ol' ? 'ol' : 'ul';
     return (
-      <ListTag key={idx} style={{ paddingLeft: 20, margin: '6px 0' }}>
+      <ListTag style={{ paddingLeft: 20, margin: '6px 0' }}>
         {(Array.isArray(block.items) ? block.items : []).map((item, itemIdx) => {
           const raw = typeof item === 'string' ? item : String(item ?? '');
           const taskMatch = raw.match(/^\[(x| )\]\s+/i);
@@ -691,7 +690,7 @@ function renderBlock(block, idx) {
   }
   if (block.type === 'p') {
     return (
-      <div key={idx} style={{ margin: '6px 0', lineHeight: '1.65' }}>
+      <div style={{ margin: '6px 0', lineHeight: '1.65' }}>
         {renderInlineWithBreaks(block.text)}
       </div>
     );
@@ -702,7 +701,7 @@ function renderBlock(block, idx) {
     const rows = Array.isArray(block.rows) ? block.rows : [];
     const columnCount = header.length;
     return (
-      <div key={idx} style={{ margin: '8px 0', overflowX: 'auto' }}>
+      <div style={{ margin: '8px 0', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead>
             <tr>
@@ -756,7 +755,7 @@ function renderBlock(block, idx) {
   return null;
 }
 
-export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, container = true }) {
+export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, container = true, copyable = false }) {
   const [expanded, setExpanded] = useState(alwaysExpanded);
   useEffect(() => {
     setExpanded(alwaysExpanded);
@@ -778,6 +777,18 @@ export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, c
       }
     : { background: 'transparent', border: 'none', borderRadius: 0, padding: 0 };
 
+  const canCopy = copyable && Boolean(content.trim());
+
+  const onCopy = async () => {
+    if (!canCopy) return;
+    try {
+      await copyPlainText(content);
+      message.success('已复制');
+    } catch (err) {
+      message.error(err?.message || '复制失败');
+    }
+  };
+
   return (
     <Space direction="vertical" size={4} style={{ width: '100%' }}>
       <div
@@ -787,12 +798,28 @@ export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, c
           overflow: limited ? 'auto' : 'visible',
         }}
       >
-        {blocks.length === 0 ? <Text type="secondary">无内容</Text> : blocks.map(renderBlock)}
+        {blocks.length === 0
+          ? <Text type="secondary">无内容</Text>
+          : blocks.map((block, idx) => <React.Fragment key={idx}>{renderBlockContent(block)}</React.Fragment>)}
       </div>
-      {tooLong && !alwaysExpanded ? (
-        <Button type="link" size="small" onClick={() => setExpanded(!expanded)}>
-          {expanded ? '收起' : '展开全部'}
-        </Button>
+      {canCopy || (tooLong && !alwaysExpanded) ? (
+        <Space size={8} wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
+          {canCopy ? (
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={onCopy}
+              title="复制"
+              aria-label="复制"
+            />
+          ) : null}
+          {tooLong && !alwaysExpanded ? (
+            <Button type="link" size="small" onClick={() => setExpanded(!expanded)}>
+              {expanded ? '收起' : '展开全部'}
+            </Button>
+          ) : null}
+        </Space>
       ) : null}
     </Space>
   );
