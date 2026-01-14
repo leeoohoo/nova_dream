@@ -1,14 +1,18 @@
-import React, { useMemo } from 'react';
-import { Alert, Layout, Spin } from 'antd';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, Input, Layout, Modal, Select, Space, Spin, Tag, Typography } from 'antd';
+import { CloseCircleOutlined, FolderOpenOutlined } from '@ant-design/icons';
 
-import { hasApi } from '../../lib/api.js';
+import { api, hasApi } from '../../lib/api.js';
+import { parseTasks } from '../../lib/parse.js';
 import { ChatSidebar } from './components/ChatSidebar.jsx';
 import { ChatSessionHeader } from './components/ChatSessionHeader.jsx';
 import { ChatMessages } from './components/ChatMessages.jsx';
 import { ChatComposer } from './components/ChatComposer.jsx';
+import { TasksWorkbenchDrawer } from './components/TasksWorkbenchDrawer.jsx';
 import { useChatController } from './hooks/useChatController.js';
 
 const { Sider, Content } = Layout;
+const { Text } = Typography;
 
 function normalizeId(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -45,6 +49,13 @@ export function ChatView({ admin }) {
     stopStreaming,
   } = controller;
 
+  const [tasks, setTasks] = useState([]);
+  const [tasksWorkbenchOpen, setTasksWorkbenchOpen] = useState(false);
+  const tasksSourceReadyRef = useRef(false);
+  const tasksBaselineSessionIdRef = useRef('');
+  const tasksBaselineIdsRef = useRef(new Set());
+  const tasksBaselineReadyRef = useRef(false);
+
   const models = useMemo(() => (Array.isArray(admin?.models) ? admin.models : []), [admin]);
   const modelById = useMemo(() => new Map(models.map((m) => [normalizeId(m?.id), m])), [models]);
   const selectedAgent = useMemo(
@@ -59,6 +70,94 @@ export function ChatView({ admin }) {
     [modelById, selectedAgent]
   );
   const visionEnabled = Boolean(selectedModel?.supportsVision);
+  const agentOptions = useMemo(
+    () =>
+      (Array.isArray(agents) ? agents : []).map((a) => ({
+        value: a.id,
+        label: a.name || a.id,
+      })),
+    [agents]
+  );
+  const workspaceRoot = useMemo(() => {
+    const raw = currentSession?.workspaceRoot;
+    return typeof raw === 'string' ? raw.trim() : '';
+  }, [currentSession?.workspaceRoot]);
+  const workspaceRootLabel = workspaceRoot || '默认（App 启动目录）';
+  const [workspaceModalOpen, setWorkspaceModalOpen] = useState(false);
+  const [workspaceDraft, setWorkspaceDraft] = useState('');
+
+  useEffect(() => {
+    setWorkspaceDraft(workspaceRoot);
+  }, [currentSession?.id, workspaceRoot]);
+
+  useEffect(() => {
+    if (!hasApi) return undefined;
+    let canceled = false;
+
+    const applyTaskSnapshot = (data) => {
+      const list = Array.isArray(data?.tasksList) ? data.tasksList : parseTasks(data?.tasks);
+      setTasks(Array.isArray(list) ? list : []);
+    };
+
+    (async () => {
+      try {
+        const payload = await api.invoke('config:read');
+        if (canceled) return;
+        tasksSourceReadyRef.current = true;
+        applyTaskSnapshot(payload);
+      } catch {
+        // ignore (older hosts may not support config:read)
+      }
+    })();
+
+    const unsub = api.on('config:update', (payload) => {
+      tasksSourceReadyRef.current = true;
+      applyTaskSnapshot(payload);
+    });
+
+    return () => {
+      canceled = true;
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  const sessionTasks = useMemo(() => {
+    const sid = normalizeId(selectedSessionId);
+    if (!sid) return [];
+    const list = Array.isArray(tasks) ? tasks : [];
+    return list.filter((task) => normalizeId(task?.sessionId) === sid);
+  }, [selectedSessionId, tasks]);
+
+  useEffect(() => {
+    if (!tasksSourceReadyRef.current) return;
+
+    const sid = normalizeId(selectedSessionId);
+    const currentIds = new Set(
+      sessionTasks
+        .map((task) => normalizeId(task?.id))
+        .filter(Boolean)
+    );
+
+    if (!tasksBaselineReadyRef.current) {
+      tasksBaselineReadyRef.current = true;
+      tasksBaselineSessionIdRef.current = sid;
+      tasksBaselineIdsRef.current = currentIds;
+      return;
+    }
+
+    if (tasksBaselineSessionIdRef.current !== sid) {
+      tasksBaselineSessionIdRef.current = sid;
+      tasksBaselineIdsRef.current = currentIds;
+      return;
+    }
+
+    const prev = tasksBaselineIdsRef.current;
+    const hasNew = Array.from(currentIds).some((id) => id && !prev.has(id));
+    tasksBaselineIdsRef.current = currentIds;
+    if (!tasksWorkbenchOpen && hasNew) {
+      setTasksWorkbenchOpen(true);
+    }
+  }, [selectedSessionId, sessionTasks, tasksWorkbenchOpen]);
 
   if (!hasApi) {
     return <Alert type="error" message="IPC bridge not available. Is preload loaded?" />;
@@ -77,18 +176,9 @@ export function ChatView({ admin }) {
       <Layout style={{ height: '100%', minHeight: 0 }}>
         <Sider width={320} style={{ background: 'var(--ds-panel-bg)', borderRight: '1px solid var(--ds-panel-border)' }}>
           <ChatSidebar
-            agents={agents}
             sessions={sessions}
-            selectedAgentId={selectedAgentId}
             selectedSessionId={selectedSessionId}
             streaming={Boolean(streamState)}
-            onAgentChange={async (agentId) => {
-              try {
-                await changeAgent(agentId);
-              } catch {
-                // changeAgent already toasts
-              }
-            }}
             onSelectSession={selectSession}
             onCreateSession={async () => {
               try {
@@ -137,13 +227,7 @@ export function ChatView({ admin }) {
             }}
           >
             <div style={{ padding: 12, borderBottom: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
-              <ChatSessionHeader
-                session={currentSession}
-                streaming={Boolean(streamState)}
-                onPickWorkspaceRoot={pickWorkspaceRoot}
-                onSetWorkspaceRoot={setWorkspaceRoot}
-                onClearWorkspaceRoot={clearWorkspaceRoot}
-              />
+              <ChatSessionHeader session={currentSession} streaming={Boolean(streamState)} />
             </div>
 
             <div style={{ flex: 1, minHeight: 0, padding: 12 }}>
@@ -157,26 +241,109 @@ export function ChatView({ admin }) {
             </div>
 
             <div style={{ padding: 12, borderTop: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
-            <ChatComposer
-              value={composerText}
-              onChange={setComposerText}
-              attachments={composerAttachments}
-              onAttachmentsChange={setComposerAttachments}
-              visionEnabled={visionEnabled}
-              onSend={async () => {
-                try {
-                  await sendMessage();
-                } catch {
-                  // sendMessage already toasts
-                }
-              }}
-              onStop={stopStreaming}
-              sending={Boolean(streamState)}
-            />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                <Space size={8} align="center" wrap>
+                  <Text type="secondary">当前 Agent</Text>
+                  <Select
+                    value={selectedAgentId || undefined}
+                    placeholder="选择 Agent"
+                    options={agentOptions}
+                    onChange={(agentId) => {
+                      void (async () => {
+                        try {
+                          await changeAgent(agentId);
+                        } catch {
+                          // changeAgent already toasts
+                        }
+                      })();
+                    }}
+                    disabled={Boolean(streamState)}
+                    style={{ minWidth: 220 }}
+                  />
+                </Space>
+
+                <div style={{ flex: 1 }} />
+
+                <Space size={8} align="center" wrap>
+                  <Tag color="blue" style={{ marginRight: 0 }}>
+                    cwd
+                  </Tag>
+                  <Text type="secondary" ellipsis={{ tooltip: workspaceRootLabel }} style={{ maxWidth: 420 }}>
+                    {workspaceRootLabel}
+                  </Text>
+                  <Button
+                    size="small"
+                    icon={<FolderOpenOutlined />}
+                    onClick={() => pickWorkspaceRoot?.()}
+                    disabled={Boolean(streamState)}
+                  >
+                    选择目录
+                  </Button>
+                  <Button size="small" onClick={() => setWorkspaceModalOpen(true)} disabled={Boolean(streamState)}>
+                    手动设置
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<CloseCircleOutlined />}
+                    onClick={() => clearWorkspaceRoot?.()}
+                    disabled={Boolean(streamState) || !workspaceRoot}
+                  >
+                    清除
+                  </Button>
+                  <Button size="small" onClick={() => setTasksWorkbenchOpen(true)}>
+                    任务 ({sessionTasks.length})
+                  </Button>
+                </Space>
+              </div>
+
+              <ChatComposer
+                value={composerText}
+                onChange={setComposerText}
+                attachments={composerAttachments}
+                onAttachmentsChange={setComposerAttachments}
+                visionEnabled={visionEnabled}
+                onSend={async () => {
+                  try {
+                    await sendMessage();
+                  } catch {
+                    // sendMessage already toasts
+                  }
+                }}
+                onStop={stopStreaming}
+                sending={Boolean(streamState)}
+              />
             </div>
           </div>
         </Content>
       </Layout>
+
+      <Modal
+        open={workspaceModalOpen}
+        title="设置工作目录"
+        okText="应用"
+        cancelText="取消"
+        onCancel={() => setWorkspaceModalOpen(false)}
+        onOk={() => {
+          setWorkspaceModalOpen(false);
+          setWorkspaceRoot?.(workspaceDraft);
+        }}
+      >
+        <Input
+          value={workspaceDraft}
+          onChange={(e) => setWorkspaceDraft(e.target.value)}
+          placeholder="输入工作目录路径（绝对路径）"
+          allowClear
+        />
+        <Typography.Text type="secondary" style={{ display: 'block', marginTop: 10 }}>
+          该会话的 MCP 工具会以此目录作为 root。
+        </Typography.Text>
+      </Modal>
+
+      <TasksWorkbenchDrawer
+        open={tasksWorkbenchOpen}
+        onClose={() => setTasksWorkbenchOpen(false)}
+        tasks={sessionTasks}
+      />
     </>
   );
 }
