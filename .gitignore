@@ -3,7 +3,7 @@ node_modules/
 
 # IDE
 .idea/
-
+/doc
 # Build output
 dist/
 dist_desktop/
