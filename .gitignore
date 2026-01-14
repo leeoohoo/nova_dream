@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
-
+aide/bin
+deepseek_cli/bin
+chatos-uiapps-devkit/bin
 # IDE
 .idea/
 /doc
@@ -65,3 +67,5 @@ deepseek_cli/ui_apps/plugins/com.leeoohoo.*/
 
 # Allow committing Node metadata even if globally ignored
 !package.json
+/aide/bin
+/aide/bin
