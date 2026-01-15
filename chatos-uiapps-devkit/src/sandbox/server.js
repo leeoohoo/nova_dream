@@ -428,13 +428,13 @@ const updateThemeControls = () => {
     el.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
   if (themeStatus) {
-    themeStatus.textContent = themeMode === 'system' ? `system -> ${currentTheme}` : currentTheme;
+    themeStatus.textContent = themeMode === 'system' ? 'system -> ' + currentTheme : currentTheme;
   }
 };
 
 const updateContextStatus = () => {
   if (!sandboxContext) return;
-  sandboxContext.textContent = `${__SANDBOX__.pluginId}:${__SANDBOX__.appId}`;
+  sandboxContext.textContent = __SANDBOX__.pluginId + ':' + __SANDBOX__.appId;
 };
 
 const isInspectorOpen = () => sandboxInspector && sandboxInspector.style.display === 'flex';
@@ -460,7 +460,7 @@ const collectTokens = () => {
     .sort()
     .map((name) => {
       const value = style.getPropertyValue(name).trim();
-      return `${name}: ${value || '(unset)'}`;
+      return name + ': ' + (value || '(unset)');
     })
     .join('\\n');
 };
