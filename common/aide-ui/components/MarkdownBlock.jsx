@@ -790,12 +790,16 @@ export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, c
   };
 
   return (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+    <Space direction="vertical" size={4} style={{ width: '100%', minWidth: 0 }}>
       <div
         style={{
           ...panelStyle,
           maxHeight: limited ? maxHeight : undefined,
-          overflow: limited ? 'auto' : 'visible',
+          overflowY: limited ? 'auto' : 'visible',
+          overflowX: 'auto',
+          maxWidth: '100%',
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere',
         }}
       >
         {blocks.length === 0
