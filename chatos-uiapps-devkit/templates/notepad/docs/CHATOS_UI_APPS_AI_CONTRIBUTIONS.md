@@ -73,6 +73,35 @@
 
 当 `ai.mcp.url` 存在时，直接使用该 url（远程/HTTP/WS 等）。
 
+### 3.1 `ai.mcp.callMeta`（调用方上下文 / 非工具参数）
+
+当 ChatOS 调用 MCP tools 时，会把 `ai.mcp.callMeta` 注入到 `tools/call` 的 `_meta` 中（不属于工具参数，因此不会暴露给 AI）。
+
+同时，宿主默认注入 `_meta.chatos.uiApp`，包含：
+
+- `pluginId` / `appId`
+- `pluginDir` / `dataDir`
+- `stateDir` / `sessionRoot` / `projectRoot`
+
+示例（`plugin.json`）：
+
+```json
+{
+  "ai": {
+    "mcp": {
+      "entry": "my-app/mcp-server.mjs",
+      "callMeta": { "workdir": "$dataDir" }
+    }
+  }
+}
+```
+
+在 MCP server 中读取（SDK handler 的 `extra._meta`）：
+
+```js
+const workdir = extra?._meta?.workdir || extra?._meta?.chatos?.uiApp?.dataDir;
+```
+
 ## 4. Agent UI 如何消费应用暴露（你需要知道的运行机制）
 
 ### 4.1 体现在哪里（持久化 vs 运行时注入）

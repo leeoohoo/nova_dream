@@ -505,6 +505,58 @@ class UiAppsManager {
       return null;
     };
 
+    const compactContext = (value) => {
+      if (!value || typeof value !== 'object') return {};
+      const out = {};
+      Object.entries(value).forEach(([key, entry]) => {
+        if (typeof entry === 'string') {
+          const trimmed = entry.trim();
+          if (trimmed) out[key] = trimmed;
+          return;
+        }
+        if (entry !== undefined && entry !== null) out[key] = entry;
+      });
+      return out;
+    };
+
+    const resolveCallMetaValue = (value, ctx) => {
+      if (typeof value === 'string') {
+        const key = value.startsWith('$') ? value.slice(1) : '';
+        if (key && Object.prototype.hasOwnProperty.call(ctx, key)) {
+          const resolved = ctx[key];
+          return typeof resolved === 'string' ? resolved : resolved ?? value;
+        }
+        return value;
+      }
+      if (Array.isArray(value)) {
+        return value.map((entry) => resolveCallMetaValue(entry, ctx));
+      }
+      if (value && typeof value === 'object') {
+        const out = {};
+        Object.entries(value).forEach(([key, entry]) => {
+          out[key] = resolveCallMetaValue(entry, ctx);
+        });
+        return out;
+      }
+      return value;
+    };
+
+    const mergeCallMeta = (base, override) => {
+      if (!base) return override || null;
+      if (!override) return base;
+      if (Array.isArray(base) || Array.isArray(override)) return override;
+      if (typeof base !== 'object' || typeof override !== 'object') return override;
+      const out = { ...base };
+      Object.entries(override).forEach(([key, entry]) => {
+        if (Object.prototype.hasOwnProperty.call(base, key)) {
+          out[key] = mergeCallMeta(base[key], entry);
+        } else {
+          out[key] = entry;
+        }
+      });
+      return out;
+    };
+
     const quoteCmdArg = (token) => {
       const raw = String(token || '');
       if (!raw) return '';
@@ -734,6 +786,25 @@ class UiAppsManager {
       delete ai.config;
     }
 
+    const buildUiAppCallMeta = () => {
+      const dataDir = this.dataRootDir ? path.join(this.dataRootDir, pluginId) : '';
+      const context = {
+        pluginId,
+        appId,
+        pluginDir,
+        dataDir,
+        stateDir: this.stateDir,
+        sessionRoot: this.sessionRoot,
+        projectRoot: this.projectRoot,
+      };
+      const uiAppContext = compactContext(context);
+      const baseMeta = Object.keys(uiAppContext).length > 0 ? { chatos: { uiApp: uiAppContext } } : null;
+      const rawCallMeta = ai?.mcp?.callMeta && typeof ai.mcp.callMeta === 'object' ? ai.mcp.callMeta : null;
+      const resolvedCallMeta = rawCallMeta ? resolveCallMetaValue(rawCallMeta, context) : null;
+      return mergeCallMeta(baseMeta, resolvedCallMeta);
+    };
+    const callMeta = ai?.mcp ? buildUiAppCallMeta() : null;
+
     const hasExposeMcpServers = exposeMcpServers === true || Array.isArray(exposeMcpServers);
     const hasExposePrompts = exposePrompts === true || Array.isArray(exposePrompts);
     if (!ai || (!ai.mcp && !ai.mcpPrompt && !ai.agent && !hasExposeMcpServers && !hasExposePrompts)) return null;
@@ -788,6 +859,7 @@ class UiAppsManager {
           enabled: typeof ai.mcp.enabled === 'boolean' ? ai.mcp.enabled : undefined,
           allowMain: typeof ai.mcp.allowMain === 'boolean' ? ai.mcp.allowMain : undefined,
           allowSub: typeof ai.mcp.allowSub === 'boolean' ? ai.mcp.allowSub : undefined,
+          callMeta: callMeta || undefined,
           auth: ai.mcp.auth || undefined,
         }
       : null;
@@ -1079,6 +1151,7 @@ class UiAppsManager {
             allowMain: typeof mcp.allowMain === 'boolean' ? mcp.allowMain : true,
             allowSub: typeof mcp.allowSub === 'boolean' ? mcp.allowSub : true,
             auth: mcp.auth || undefined,
+            callMeta: mcp.callMeta || undefined,
             updatedAt: now(),
           };
 
@@ -1127,6 +1200,11 @@ class UiAppsManager {
             const existingAuth = existing.auth || undefined;
             const nextAuth = desired.auth || undefined;
             if (JSON.stringify(existingAuth || null) !== JSON.stringify(nextAuth || null)) patch.auth = nextAuth || undefined;
+            const existingCallMeta = existing.callMeta || undefined;
+            const nextCallMeta = desired.callMeta || undefined;
+            if (JSON.stringify(existingCallMeta || null) !== JSON.stringify(nextCallMeta || null)) {
+              patch.callMeta = nextCallMeta || undefined;
+            }
 
 	            if (Object.keys(patch).length > 0) {
 	              try {

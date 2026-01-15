@@ -109,6 +109,7 @@ function normalizeServer(entry) {
       api_key_env: '',
       description: '',
       auth: undefined,
+      callMeta: undefined,
       tags: [],
       enabled: true,
       allowMain: false,
@@ -128,6 +129,12 @@ function normalizeServer(entry) {
   } else if (entry.auth) {
     auth = entry.auth;
   }
+  const callMeta =
+    entry.callMeta && typeof entry.callMeta === 'object'
+      ? entry.callMeta
+      : entry.call_meta && typeof entry.call_meta === 'object'
+        ? entry.call_meta
+        : undefined;
   return {
     app_id: String(entry.app_id || entry.appId || ''),
     name: String(entry.name || ''),
@@ -135,6 +142,7 @@ function normalizeServer(entry) {
     api_key_env: apiKeyEnv,
     description,
     auth,
+    callMeta,
     tags,
     enabled: entry.enabled !== false && entry.disabled !== true,
     allowMain: entry.allowMain === true || entry.allow_main === true,

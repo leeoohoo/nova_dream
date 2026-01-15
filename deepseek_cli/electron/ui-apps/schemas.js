@@ -67,6 +67,7 @@ const aiMcpServerSchema = z.object({
   command: z.string().trim().min(1).optional(),
   entry: z.string().trim().min(1).optional(),
   args: z.array(z.string().trim()).optional().default([]),
+  callMeta: z.record(z.unknown()).optional(),
   description: z.string().trim().optional().default(''),
   tags: z.array(z.string().trim()).optional().default([]),
   enabled: z.boolean().optional(),

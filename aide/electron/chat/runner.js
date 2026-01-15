@@ -550,6 +550,7 @@ export function createChatRunner({
                 allowMain,
                 allowSub,
                 auth,
+                callMeta: mcp?.callMeta || undefined,
               });
               extraMcpRuntimeServers.push({
                 name: mcp?.name || serverName,
@@ -560,6 +561,7 @@ export function createChatRunner({
                 allowMain,
                 allowSub,
                 auth,
+                callMeta: mcp?.callMeta || undefined,
               });
               derivedMcpServerIds.push(uiId);
             } else {

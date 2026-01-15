@@ -530,10 +530,12 @@ function registerRemoteTool(client, serverEntry, tool) {
         tool: tool.name,
         args: injectedArgs,
       });
+      const callMeta = buildCallMeta(serverEntry);
       const response = await client.callTool(
         {
           name: tool.name,
           arguments: normalizedArgs,
+          ...(callMeta ? { _meta: callMeta } : {}),
         },
         undefined,
         optionsWithSignal
@@ -608,6 +610,13 @@ function formatCallResult(serverName, toolName, result) {
     segments.push('工具执行成功，但没有可展示的文本输出。');
   }
   return `${header}\n${segments.join('\n\n')}`;
+}
+
+function buildCallMeta(serverEntry) {
+  if (!serverEntry || typeof serverEntry !== 'object') return null;
+  const raw = serverEntry.callMeta ?? serverEntry.call_meta;
+  if (!raw || typeof raw !== 'object') return null;
+  return raw;
 }
 
 function buildRequestOptions(serverEntry) {

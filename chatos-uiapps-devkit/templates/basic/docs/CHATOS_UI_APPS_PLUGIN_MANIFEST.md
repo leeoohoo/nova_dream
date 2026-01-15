@@ -132,6 +132,7 @@
 | `entry` | `string` | 二选一 | - | 本地脚本入口（相对插件目录）；宿主会转换为 `cmd://...` |
 | `command` | `string` | 否 | `"node"` | 拉起本地 `entry` 时使用的命令 |
 | `args` | `string[]` | 否 | `[]` | 拉起时追加参数 |
+| `callMeta` | `object` | 否 | - | 调用 MCP 工具时注入到 `_meta` 的附加字段（不会暴露给 AI）；支持 `$pluginId/$appId/$pluginDir/$dataDir/$stateDir/$sessionRoot/$projectRoot` 变量 |
 | `description` | `string` | 否 | `""` | 描述 |
 | `tags` | `string[]` | 否 | `[]` | 标签（宿主还会自动附加 `uiapp*` 标签） |
 | `enabled` | `boolean` | 否 | - | 是否启用（未填则宿主同步时默认 `true`） |
@@ -160,6 +161,8 @@
 - `command` 默认为 `node`
 - `args` 会追加到命令行末尾
 - 宿主会把空格/引号等做安全引用，以避免路径包含空格时解析失败
+
+`callMeta` 会随每次 `tools/call` 请求发送给 MCP server（位于 `request.params._meta`），默认会合并宿主注入的 `_meta.chatos.uiApp`（含 `pluginId/appId/pluginDir/dataDir/stateDir/sessionRoot/projectRoot`）。
 
 ## 6. `ai.mcpPrompt`：应用默认 Prompt 声明
 
