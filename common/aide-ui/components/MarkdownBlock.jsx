@@ -622,14 +622,17 @@ function renderBlockContent(block) {
     if (normalized === 'mermaid' || normalized === 'mmd' || (!normalized && looksLikeMermaid(block.text))) {
       return <MermaidDiagram text={block.text} />;
     }
+    const rawCode = typeof block.text === 'string' ? block.text : String(block.text ?? '');
+    const hasLongLine = rawCode.split('\n').some((line) => line.length > 200);
+    const wrapCode = hasLongLine;
     return (
       <CodeBlock
         text={block.text}
         maxHeight={320}
         highlight
         language={lang || undefined}
-        wrap={false}
-        showLineNumbers
+        wrap={wrapCode}
+        showLineNumbers={!wrapCode}
         disableScroll
       />
     );

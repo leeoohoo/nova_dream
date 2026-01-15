@@ -34,6 +34,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
   const ignoreScrollRef = useRef(false);
   const nextScrollBehaviorRef = useRef('auto');
   const lastUpdated = list.length > 0 ? list[list.length - 1].tsText : null;
+  const codeBlockClampStyle = { width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' };
 
   const toggleDetails = (key) => {
     setExpandedDetails((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -258,11 +259,15 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             args
                           </Text>
-                          <CodeBlock text={formatJson(item?.payload?.args) || '无 args'} maxHeight={220} highlight />
+                          <div style={codeBlockClampStyle}>
+                            <CodeBlock text={formatJson(item?.payload?.args) || '无 args'} maxHeight={220} highlight />
+                          </div>
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             result
                           </Text>
-                          <CodeBlock text={formatJson(item?.payload?.result) || '无 result'} maxHeight={260} highlight />
+                          <div style={codeBlockClampStyle}>
+                            <CodeBlock text={formatJson(item?.payload?.result) || '无 result'} maxHeight={260} highlight />
+                          </div>
                         </>
                       ) : null}
                       {collapsible || !isToolLike ? (
@@ -271,14 +276,22 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
                             payload / event
                           </Text>
                           {payloadJson ? (
-                            <CodeBlock text={payloadJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={payloadJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : eventJson ? (
-                            <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : (
-                            <CodeBlock text="无更多详情" maxHeight={260} />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text="无更多详情" maxHeight={260} />
+                            </div>
                           )}
                           {eventJson && eventJson !== payloadJson ? (
-                            <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : null}
                         </>
                       ) : null}
