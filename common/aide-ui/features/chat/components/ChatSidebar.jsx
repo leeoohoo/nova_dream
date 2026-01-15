@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Dropdown, Input, List, Modal, Space, Typography } from 'antd';
-import { DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, MenuFoldOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -23,6 +23,7 @@ export function ChatSidebar({
   onDeleteSession,
   onRenameSession,
   onRefresh,
+  onCollapse,
 }) {
   const [renameState, setRenameState] = useState(null);
 
@@ -47,6 +48,7 @@ export function ChatSidebar({
         <Text type="secondary" style={{ flex: 1 }}>
           会话
         </Text>
+        {onCollapse ? <Button size="small" icon={<MenuFoldOutlined />} onClick={() => onCollapse?.()} /> : null}
         <Button size="small" icon={<ReloadOutlined />} onClick={() => onRefresh?.()} />
         <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => onCreateSession?.()} disabled={streaming} />
       </div>

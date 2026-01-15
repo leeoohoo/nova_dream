@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Space, Tooltip } from 'antd';
 import {
   AppstoreOutlined,
@@ -39,8 +39,21 @@ export function ChatView({ admin, onNavigate }) {
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [drawerFullscreen, setDrawerFullscreen] = useState(false);
   const [activeApp, setActiveApp] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarCollapsedBeforeAppRef = useRef(false);
 
   const showApp = Boolean(activeApp?.pluginId && activeApp?.appId);
+
+  useEffect(() => {
+    if (showApp) {
+      setSidebarCollapsed((prev) => {
+        sidebarCollapsedBeforeAppRef.current = prev;
+        return true;
+      });
+      return;
+    }
+    setSidebarCollapsed(sidebarCollapsedBeforeAppRef.current);
+  }, [showApp]);
 
   const handleDrawerNavigate = useCallback(
     (route) => {
@@ -64,12 +77,12 @@ export function ChatView({ admin, onNavigate }) {
   );
 
   const drawerStyle = useMemo(() => {
-    const width = drawerFullscreen ? '100%' : DEFAULT_DRAWER_WIDTH;
+    const width = drawerFullscreen ? '100%' : showApp ? '50%' : DEFAULT_DRAWER_WIDTH;
     return {
       width,
-      minWidth: drawerFullscreen ? 0 : DEFAULT_DRAWER_WIDTH,
+      minWidth: drawerFullscreen ? 0 : showApp ? '50%' : DEFAULT_DRAWER_WIDTH,
       maxWidth: '100%',
-      flex: drawerFullscreen ? '1 1 auto' : '0 0 auto',
+      flex: drawerFullscreen ? '1 1 auto' : showApp ? '0 0 50%' : '0 0 auto',
       background: 'var(--ds-panel-bg)',
       borderLeft: drawerFullscreen ? 'none' : '1px solid var(--ds-panel-border)',
       boxShadow: 'var(--ds-panel-shadow)',
@@ -77,13 +90,17 @@ export function ChatView({ admin, onNavigate }) {
       flexDirection: 'column',
       minHeight: 0,
     };
-  }, [drawerFullscreen]);
+  }, [drawerFullscreen, showApp]);
 
   return (
-    <div style={{ position: 'relative', height: '100%', minHeight: 0, display: 'flex', gap: 12 }}>
+    <div style={{ position: 'relative', height: '100%', minHeight: 0, display: 'flex', gap: 4 }}>
       {!drawerFullscreen ? (
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <BaseChatView admin={admin} />
+          <BaseChatView
+            admin={admin}
+            sidebarCollapsed={sidebarCollapsed}
+            onSidebarCollapsedChange={setSidebarCollapsed}
+          />
           {!drawerOpen ? (
             <Tooltip title="Apps">
               <Button
