@@ -165,7 +165,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
         </Space>
       }
       style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}
-      bodyStyle={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+      bodyStyle={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}
     >
       <Space size="small" wrap style={{ marginBottom: 12, width: '100%', minWidth: 0 }}>
         {lastUpdated ? (
@@ -213,7 +213,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+        style={{ flex: 1, minHeight: 0, minWidth: 0, maxWidth: '100%', overflow: 'auto' }}
       >
 	        <List
 	          itemLayout="vertical"
@@ -288,7 +288,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
               </List.Item>
 	            );
 	          }}
-	          style={{ minHeight: 0 }}
+	          style={{ minHeight: 0, minWidth: 0, width: '100%' }}
 	        />
 	      </div>
 	      <div style={{ paddingTop: 8, display: 'flex', justifyContent: 'flex-end' }}>

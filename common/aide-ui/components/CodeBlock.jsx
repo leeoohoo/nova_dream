@@ -86,9 +86,13 @@ export function CodeBlock({
     color: 'var(--ds-code-text)',
     whiteSpace: effectiveWrap ? 'pre-wrap' : 'pre',
     wordBreak: effectiveWrap ? 'break-word' : 'normal',
+    overflowWrap: effectiveWrap ? 'anywhere' : 'normal',
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     maxHeight: heightConstrained ? maxHeight : undefined,
     overflowY,
-    overflowX: heightConstrained ? (effectiveWrap ? 'hidden' : 'auto') : 'visible',
+    overflowX: 'auto',
   };
 
   const lineNumberText = useMemo(() => {
@@ -112,7 +116,7 @@ export function CodeBlock({
   };
 
   return (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+    <Space direction="vertical" size={4} style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
       {showLineNumbers ? (
         <div
           style={{
