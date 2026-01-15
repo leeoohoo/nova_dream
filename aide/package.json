@@ -51,7 +51,7 @@
   },
   "optionalDependencies": {
     "chrome-devtools-mcp": "^0.12.1",
-    "electron": "38.0.0-beta.6"
+    "electron": "39.2.7"
   },
   "engines": {
     "node": ">=18"
