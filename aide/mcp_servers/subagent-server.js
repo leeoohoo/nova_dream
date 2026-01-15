@@ -158,7 +158,7 @@ function persistCursor(cursorPath, cursor) {
   }
 }
 
-function createRunInboxListener({ runId, sessionRoot, consumerId, onEntry } = {}) {
+function createRunInboxListener({ runId, sessionRoot, consumerId, onEntry, skipExisting } = {}) {
   const rid = typeof runId === 'string' ? runId.trim() : '';
   const root = typeof sessionRoot === 'string' ? sessionRoot.trim() : '';
   if (!rid || !root) return null;
@@ -172,6 +172,14 @@ function createRunInboxListener({ runId, sessionRoot, consumerId, onEntry } = {}
   touchFile(inboxPath);
 
   let cursor = readCursor(cursorPath);
+  if (skipExisting === true && !fs.existsSync(cursorPath)) {
+    try {
+      cursor = fs.statSync(inboxPath).size;
+      persistCursor(cursorPath, cursor);
+    } catch {
+      // ignore
+    }
+  }
   let partial = '';
   let watcher = null;
   let poll = null;
@@ -546,6 +554,7 @@ async function executeSubAgent({ task, agentId, category, skills = [], model, qu
     runId: RUN_ID,
     sessionRoot: SESSION_ROOT,
     consumerId: `subagent_${isWorkerMode ? 'worker' : 'router'}_${process.pid}`,
+    skipExisting: true,
     onEntry: (entry) => {
       if (!entry || typeof entry !== 'object') return;
       if (String(entry.type || '') !== 'correction') return;
