@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Button, Divider, Dropdown, Input, List, Modal, Select, Space, Typography } from 'antd';
+import React, { useState } from 'react';
+import { Button, Dropdown, Input, List, Modal, Space, Typography } from 'antd';
 import { DeleteOutlined, EditOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -15,12 +15,9 @@ function formatTime(ts) {
 }
 
 export function ChatSidebar({
-  agents,
   sessions,
-  selectedAgentId,
   selectedSessionId,
   streaming,
-  onAgentChange,
   onSelectSession,
   onCreateSession,
   onDeleteSession,
@@ -28,19 +25,6 @@ export function ChatSidebar({
   onRefresh,
 }) {
   const [renameState, setRenameState] = useState(null);
-  const agentOptions = useMemo(
-    () =>
-      (Array.isArray(agents) ? agents : []).map((a) => ({
-        value: a.id,
-        label: a.name || a.id,
-      })),
-    [agents]
-  );
-
-  const currentAgent = useMemo(
-    () => (Array.isArray(agents) ? agents.find((a) => normalizeId(a?.id) === normalizeId(selectedAgentId)) : null),
-    [agents, selectedAgentId]
-  );
 
   const sessionMenu = (session) => ({
     items: [
@@ -59,27 +43,6 @@ export function ChatSidebar({
 
   return (
     <div style={{ padding: 14, height: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <Space direction="vertical" size={6} style={{ width: '100%' }}>
-        <Text type="secondary">当前 Agent</Text>
-        <Select
-          value={selectedAgentId || undefined}
-          placeholder="选择 Agent"
-          options={agentOptions}
-          onChange={(v) => onAgentChange?.(v)}
-          disabled={streaming}
-          style={{ width: '100%' }}
-        />
-        {currentAgent?.description ? (
-          <Text type="secondary" style={{ whiteSpace: 'pre-wrap' }}>
-            {currentAgent.description}
-          </Text>
-        ) : (
-          <Text type="secondary">在顶部 “Agent” 子菜单中管理/新增。</Text>
-        )}
-      </Space>
-
-      <Divider style={{ margin: '10px 0' }} />
-
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Text type="secondary" style={{ flex: 1 }}>
           会话
