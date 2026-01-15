@@ -17,6 +17,12 @@ npm run dev
 - `plugin/shared/`：共享存储实现（后端持久化所需）
 - `docs/`：协议文档快照（随工程分发）
 
+## 主题与样式（重要）
+
+- 宿主通过 `document.documentElement.dataset.theme` 下发 `light` / `dark`，用 `host.theme.get()` / `host.theme.onChange()` 读取与监听。
+- 推荐使用 CSS Tokens（`--ds-*`）做主题适配，避免硬编码颜色。
+- 本地沙箱右上角提供 Theme 切换（light/dark/system）用于测试样式响应。
+
 ## 后端 API（示例）
 
 前端通过 `host.backend.invoke(method, params)` 调用后端方法，本模板提供 `notes.*` 一组方法用于管理笔记：
@@ -33,4 +39,3 @@ npm run dev
 
 1) 实现并 **bundle 成单文件**（建议 esbuild/rollup，把 `@modelcontextprotocol/sdk` 等依赖打进去）  
 2) 在 `plugin/plugin.json` 的 `apps[i].ai.mcp` 写入 `entry/command/args/...` 并指向 bundle 产物  
-

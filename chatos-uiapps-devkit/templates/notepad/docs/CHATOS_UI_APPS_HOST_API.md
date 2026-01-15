@@ -55,6 +55,12 @@ export function mount({ container, host, slots }) {
 - `host.theme.get(): string`（当前实现读取 `document.documentElement.dataset.theme`）
 - `host.theme.onChange(listener): () => void`
 
+补充说明：
+
+- `theme` 取值通常为 `light` / `dark`，宿主会通过 `document.documentElement.dataset.theme` 下发。
+- 本地沙箱右上角提供 Theme 切换（light/dark/system），用于测试 `host.theme.onChange` 与样式响应。
+- 建议使用宿主的 CSS Tokens（`--ds-*`）对齐主题与视觉，例如 `--ds-panel-bg` / `--ds-panel-border` / `--ds-subtle-bg` / `--ds-focus-ring` / `--ds-code-bg` / `--ds-code-border`。
+
 ### 3.2 Admin（全局配置读取）
 
 - `host.admin.state(): Promise<any>`：读取全局 Admin 状态快照

@@ -7,6 +7,7 @@ export function mount({ container, host, slots }) {
 
   const ctx = typeof host?.context?.get === 'function' ? host.context.get() : { pluginId: '', appId: '', theme: 'light' };
   const bridgeEnabled = Boolean(ctx?.bridge?.enabled);
+  const appMetaPrefix = `${ctx?.pluginId || ''}:${ctx?.appId || ''}`;
 
   const root = document.createElement('div');
   root.style.height = '100%';
@@ -23,11 +24,21 @@ export function mount({ container, host, slots }) {
   const meta = document.createElement('div');
   meta.style.fontSize = '12px';
   meta.style.opacity = '0.75';
-  meta.textContent = `${ctx?.pluginId || ''}:${ctx?.appId || ''} · theme=${ctx?.theme || 'light'} · bridge=${bridgeEnabled ? 'enabled' : 'disabled'}`;
+  const renderMeta = (theme) => {
+    meta.textContent = `${appMetaPrefix} · theme=${theme || 'light'} · bridge=${bridgeEnabled ? 'enabled' : 'disabled'}`;
+  };
+  renderMeta(ctx?.theme || 'light');
 
   const header = document.createElement('div');
   header.appendChild(title);
   header.appendChild(meta);
+
+  const applyTheme = (theme) => {
+    const nextTheme = theme || 'light';
+    root.dataset.theme = nextTheme;
+    renderMeta(nextTheme);
+  };
+  applyTheme(ctx?.theme || 'light');
 
   const body = document.createElement('div');
   body.style.display = 'grid';
@@ -37,7 +48,7 @@ export function mount({ container, host, slots }) {
   body.style.minHeight = '0';
 
   const actions = document.createElement('div');
-  actions.style.border = '1px solid rgba(0,0,0,0.12)';
+  actions.style.border = '1px solid var(--ds-panel-border, rgba(0,0,0,0.12))';
   actions.style.borderRadius = '14px';
   actions.style.padding = '12px';
   actions.style.display = 'grid';
@@ -49,14 +60,14 @@ export function mount({ container, host, slots }) {
   input.style.minHeight = '86px';
   input.style.boxSizing = 'border-box';
   input.style.borderRadius = '12px';
-  input.style.border = '1px solid rgba(0,0,0,0.14)';
-  input.style.background = 'rgba(0,0,0,0.04)';
+  input.style.border = '1px solid var(--ds-panel-border, rgba(0,0,0,0.14))';
+  input.style.background = 'var(--ds-subtle-bg, rgba(0,0,0,0.04))';
   input.style.padding = '10px 10px';
   input.style.resize = 'vertical';
   input.style.outline = 'none';
 
   const log = document.createElement('pre');
-  log.style.border = '1px solid rgba(0,0,0,0.12)';
+  log.style.border = '1px solid var(--ds-panel-border, rgba(0,0,0,0.12))';
   log.style.borderRadius = '14px';
   log.style.padding = '12px';
   log.style.margin = '0';
@@ -75,8 +86,8 @@ export function mount({ container, host, slots }) {
     btn.textContent = label;
     btn.style.padding = '9px 10px';
     btn.style.borderRadius = '12px';
-    btn.style.border = '1px solid rgba(0,0,0,0.14)';
-    btn.style.background = 'rgba(0,0,0,0.04)';
+    btn.style.border = '1px solid var(--ds-panel-border, rgba(0,0,0,0.14))';
+    btn.style.background = 'var(--ds-subtle-bg, rgba(0,0,0,0.04))';
     btn.style.cursor = 'pointer';
     btn.style.fontWeight = '650';
     return btn;
@@ -135,6 +146,11 @@ export function mount({ container, host, slots }) {
 
   let activeSessionId = '';
   let chatUnsub = null;
+  let themeUnsub = null;
+
+  if (typeof host?.theme?.onChange === 'function') {
+    themeUnsub = host.theme.onChange((theme) => applyTheme(theme));
+  }
 
   const ensureSession = async () => {
     const agents = await run('chat.agents.list', () => host.chat.agents.list());
@@ -253,6 +269,14 @@ export function mount({ container, host, slots }) {
         // ignore
       }
       chatUnsub = null;
+    }
+    if (themeUnsub) {
+      try {
+        themeUnsub();
+      } catch {
+        // ignore
+      }
+      themeUnsub = null;
     }
     try {
       container.textContent = '';

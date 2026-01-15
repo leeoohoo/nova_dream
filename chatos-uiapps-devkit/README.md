@@ -28,6 +28,11 @@ npm install
 npm run dev
 ```
 
+## 沙箱能力
+
+- 模拟 `module mount()` 与 `host.*` API
+- 右上角 Theme 切换（light/dark/system），用于测试 `host.theme.onChange` 与样式响应
+
 ## 模板
 
 ```bash

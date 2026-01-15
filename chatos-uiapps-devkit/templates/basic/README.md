@@ -22,6 +22,12 @@ npm run dev
 - 用 HTTP 运行你的 `module` 入口（模拟 ChatOS 的 `mount()` 调用）
 - 提供 `host.*` 的 mock（含 `host.backend.invoke()`、`host.uiPrompts.*`、`host.chat.*`）
 
+## 主题与样式（重要）
+
+- 宿主通过 `document.documentElement.dataset.theme` 下发 `light` / `dark`，用 `host.theme.get()` / `host.theme.onChange()` 读取与监听。
+- 推荐使用 CSS Tokens（`--ds-*`）做主题适配，避免硬编码颜色。
+- 本地沙箱右上角提供 Theme 切换（light/dark/system）用于测试样式响应。
+
 ## 复用 ChatOS 的 AI 调用（推荐）
 
 本模板演示两种“复用宿主模型/密钥/工具链”的方式：
