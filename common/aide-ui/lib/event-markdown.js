@@ -224,13 +224,9 @@ function summarizeResult(result) {
   if (typeof result === 'string') {
     const text = result.replace(/\r\n/g, '\n').trim();
     if (!text) return '_空字符串_';
-    const lines = text.split('\n');
-    const previewLines = lines.slice(0, 60);
-    const previewText = previewLines.join('\n');
-    const suffix = lines.length > 60 ? `\n…(省略 ${lines.length - 60} 行)` : '';
-    return `\n\`\`\`text\n${truncateText(previewText + suffix, 6000)}\n\`\`\``;
+    return `\n\`\`\`text\n${text}\n\`\`\``;
   }
-  return `\n\`\`\`json\n${truncateText(formatJson(result), 6000)}\n\`\`\``;
+  return `\n\`\`\`json\n${formatJson(result)}\n\`\`\``;
 }
 
 function normalizeEventText(payload) {
