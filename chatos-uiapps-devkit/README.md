@@ -32,6 +32,7 @@ npm run dev
 
 - 模拟 `module mount()` 与 `host.*` API
 - 右上角 Theme 切换（light/dark/system），用于测试 `host.theme.onChange` 与样式响应
+- Inspect 面板展示 `host.context` 与 `--ds-*` tokens
 
 ## 模板
 

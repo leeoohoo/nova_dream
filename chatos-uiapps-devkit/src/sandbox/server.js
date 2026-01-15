@@ -7,6 +7,31 @@ import { ensureDir, isDirectory, isFile } from '../lib/fs.js';
 import { loadPluginManifest, pickAppFromManifest } from '../lib/plugin.js';
 import { resolveInsideDir } from '../lib/path-boundary.js';
 
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const TOKEN_REGEX = /--ds-[a-z0-9-]+/gi;
+const GLOBAL_STYLES_CANDIDATES = [
+  path.resolve(__dirname, '..', '..', '..', 'common', 'aide-ui', 'components', 'GlobalStyles.jsx'),
+  path.resolve(process.cwd(), 'common', 'aide-ui', 'components', 'GlobalStyles.jsx'),
+];
+
+function loadTokenNames() {
+  for (const candidate of GLOBAL_STYLES_CANDIDATES) {
+    try {
+      if (!isFile(candidate)) continue;
+      const raw = fs.readFileSync(candidate, 'utf8');
+      const matches = raw.match(TOKEN_REGEX) || [];
+      const names = Array.from(new Set(matches.map((v) => v.toLowerCase())));
+      if (names.length > 0) return names.sort();
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
+
 function sendJson(res, status, obj) {
   const raw = JSON.stringify(obj);
   res.writeHead(status, {
@@ -224,6 +249,37 @@ function htmlPage() {
       .row { display:flex; gap:10px; }
       .toolbar-group { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
       .segmented { display:flex; gap:6px; align-items:center; }
+      #sandboxInspector {
+        position: fixed;
+        right: 12px;
+        top: 72px;
+        width: 360px;
+        max-height: 70vh;
+        display: none;
+        flex-direction: column;
+        background: var(--ds-panel-bg);
+        border: 1px solid var(--ds-panel-border);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 14px 40px rgba(0,0,0,0.16);
+        z-index: 10;
+      }
+      #sandboxInspectorHeader {
+        padding: 10px 12px;
+        display:flex;
+        align-items:center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--ds-panel-border);
+      }
+      #sandboxInspectorBody {
+        padding: 10px 12px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-title { font-size: 12px; font-weight: 700; opacity: 0.8; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; }
       input, textarea, select {
         width:100%;
         padding:8px;
@@ -253,6 +309,8 @@ function htmlPage() {
               <button id="btnThemeSystem" class="btn" type="button">System</button>
             </div>
             <div id="themeStatus" class="muted"></div>
+            <div id="sandboxContext" class="muted"></div>
+            <button id="btnInspectorToggle" class="btn" type="button">Inspect</button>
             <button id="btnReload" class="btn" type="button">Reload</button>
           </div>
         </div>
@@ -269,6 +327,30 @@ function htmlPage() {
         <button id="promptsClose" class="btn" type="button">Close</button>
       </div>
       <div id="promptsPanelBody"></div>
+    </div>
+
+    <div id="sandboxInspector" aria-hidden="true">
+      <div id="sandboxInspectorHeader">
+        <div style="font-weight:800">Sandbox Inspector</div>
+        <div class="row">
+          <button id="btnInspectorRefresh" class="btn" type="button">Refresh</button>
+          <button id="btnInspectorClose" class="btn" type="button">Close</button>
+        </div>
+      </div>
+      <div id="sandboxInspectorBody">
+        <div>
+          <div class="section-title">Host Context</div>
+          <pre id="inspectorContext" class="mono"></pre>
+        </div>
+        <div>
+          <div class="section-title">Theme</div>
+          <pre id="inspectorTheme" class="mono"></pre>
+        </div>
+        <div>
+          <div class="section-title">Tokens</div>
+          <pre id="inspectorTokens" class="mono"></pre>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="/sandbox.mjs"></script>
@@ -289,6 +371,14 @@ const btnThemeLight = $('#btnThemeLight');
 const btnThemeDark = $('#btnThemeDark');
 const btnThemeSystem = $('#btnThemeSystem');
 const themeStatus = $('#themeStatus');
+const sandboxContext = $('#sandboxContext');
+const btnInspectorToggle = $('#btnInspectorToggle');
+const sandboxInspector = $('#sandboxInspector');
+const btnInspectorClose = $('#btnInspectorClose');
+const btnInspectorRefresh = $('#btnInspectorRefresh');
+const inspectorContext = $('#inspectorContext');
+const inspectorTheme = $('#inspectorTheme');
+const inspectorTokens = $('#inspectorTokens');
 
 const setPanelOpen = (open) => { panel.style.display = open ? 'flex' : 'none'; };
 fab.addEventListener('click', () => setPanelOpen(panel.style.display !== 'flex'));
@@ -318,6 +408,8 @@ const loadThemeMode = () => {
 
 let themeMode = loadThemeMode();
 let currentTheme = 'light';
+let inspectorEnabled = false;
+let inspectorTimer = null;
 
 const resolveTheme = () => {
   if (themeMode === 'light' || themeMode === 'dark') return themeMode;
@@ -340,6 +432,88 @@ const updateThemeControls = () => {
   }
 };
 
+const updateContextStatus = () => {
+  if (!sandboxContext) return;
+  sandboxContext.textContent = `${__SANDBOX__.pluginId}:${__SANDBOX__.appId}`;
+};
+
+const isInspectorOpen = () => sandboxInspector && sandboxInspector.style.display === 'flex';
+
+const formatJson = (value) => {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const tokenNameList = Array.isArray(__SANDBOX__.tokenNames) ? __SANDBOX__.tokenNames : [];
+
+const collectTokens = () => {
+  const style = getComputedStyle(document.documentElement);
+  const names = new Set(tokenNameList);
+  for (let i = 0; i < style.length; i += 1) {
+    const name = style[i];
+    if (name && name.startsWith('--ds-')) names.add(name);
+  }
+  return [...names]
+    .sort()
+    .map((name) => {
+      const value = style.getPropertyValue(name).trim();
+      return `${name}: ${value || '(unset)'}`;
+    })
+    .join('\\n');
+};
+
+const readHostContext = () => {
+  if (!inspectorEnabled) return null;
+  if (typeof host?.context?.get === 'function') return host.context.get();
+  return { pluginId: __SANDBOX__.pluginId, appId: __SANDBOX__.appId, theme: currentTheme, bridge: { enabled: true } };
+};
+
+const readThemeInfo = () => ({
+  themeMode,
+  currentTheme,
+  dataTheme: document.documentElement.dataset.theme || '',
+  dataThemeMode: document.documentElement.dataset.themeMode || '',
+  prefersColorScheme: systemQuery ? (systemQuery.matches ? 'dark' : 'light') : 'unknown',
+});
+
+const updateInspector = () => {
+  if (!inspectorEnabled) return;
+  if (inspectorContext) inspectorContext.textContent = formatJson(readHostContext());
+  if (inspectorTheme) inspectorTheme.textContent = formatJson(readThemeInfo());
+  if (inspectorTokens) inspectorTokens.textContent = collectTokens();
+};
+
+const startInspectorTimer = () => {
+  if (inspectorTimer) return;
+  inspectorTimer = setInterval(updateInspector, 1000);
+};
+
+const stopInspectorTimer = () => {
+  if (!inspectorTimer) return;
+  clearInterval(inspectorTimer);
+  inspectorTimer = null;
+};
+
+const setInspectorOpen = (open) => {
+  if (!sandboxInspector) return;
+  sandboxInspector.style.display = open ? 'flex' : 'none';
+  sandboxInspector.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (open) {
+    updateInspector();
+    startInspectorTimer();
+  } else {
+    stopInspectorTimer();
+  }
+};
+
+const updateInspectorIfOpen = () => {
+  if (!inspectorEnabled) return;
+  if (isInspectorOpen()) updateInspector();
+};
+
 const applyThemeMode = (mode, { persist = true } = {}) => {
   themeMode = normalizeThemeMode(mode);
   if (persist) {
@@ -355,6 +529,7 @@ const applyThemeMode = (mode, { persist = true } = {}) => {
   document.documentElement.dataset.theme = nextTheme;
   document.documentElement.dataset.themeMode = themeMode;
   updateThemeControls();
+  updateInspectorIfOpen();
   if (nextTheme !== prevTheme) emitThemeChange(nextTheme);
 };
 
@@ -367,8 +542,12 @@ if (systemQuery && typeof systemQuery.addEventListener === 'function') {
 if (btnThemeLight) btnThemeLight.addEventListener('click', () => applyThemeMode('light'));
 if (btnThemeDark) btnThemeDark.addEventListener('click', () => applyThemeMode('dark'));
 if (btnThemeSystem) btnThemeSystem.addEventListener('click', () => applyThemeMode('system'));
+if (btnInspectorToggle) btnInspectorToggle.addEventListener('click', () => setInspectorOpen(!isInspectorOpen()));
+if (btnInspectorClose) btnInspectorClose.addEventListener('click', () => setInspectorOpen(false));
+if (btnInspectorRefresh) btnInspectorRefresh.addEventListener('click', () => updateInspector());
 
 applyThemeMode(themeMode || 'system', { persist: false });
+updateContextStatus();
 
 const entries = [];
 const listeners = new Set();
@@ -770,6 +949,9 @@ const host = {
   })(),
 };
 
+inspectorEnabled = true;
+updateInspector();
+
 let dispose = null;
 
 async function loadAndMount() {
@@ -941,11 +1123,13 @@ export async function startSandboxServer({ pluginDir, port = 4399, appId = '' })
       }
 
       if (req.method === 'GET' && pathname === '/sandbox.mjs') {
+        const tokenNames = loadTokenNames();
         const js = sandboxClientJs()
           .replaceAll('__SANDBOX__.pluginId', JSON.stringify(ctxBase.pluginId))
           .replaceAll('__SANDBOX__.appId', JSON.stringify(effectiveAppId))
           .replaceAll('__SANDBOX__.entryUrl', JSON.stringify(entryUrl))
-          .replaceAll('__SANDBOX__.registryApp', JSON.stringify({ plugin: { id: ctxBase.pluginId }, id: effectiveAppId, entry: { type: 'module', url: entryUrl } }));
+          .replaceAll('__SANDBOX__.registryApp', JSON.stringify({ plugin: { id: ctxBase.pluginId }, id: effectiveAppId, entry: { type: 'module', url: entryUrl } }))
+          .replaceAll('__SANDBOX__.tokenNames', JSON.stringify(tokenNames));
         return sendText(res, 200, js, 'text/javascript; charset=utf-8');
       }
 
