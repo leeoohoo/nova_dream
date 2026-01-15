@@ -52,6 +52,16 @@ export async function cmdValidate({ flags }) {
     const entryAbs = resolveInsideDir(pluginDir, entryPath);
     assert(isFile(entryAbs), `apps[${appId}].entry.path must be a file: ${entryPath}`);
 
+    const compactType = app?.entry?.compact?.type;
+    if (compactType && compactType !== 'module') {
+      assert(false, `apps[${appId}].entry.compact.type must be "module"`);
+    }
+    const compactPath = typeof app?.entry?.compact?.path === 'string' ? app.entry.compact.path.trim() : '';
+    if (compactPath) {
+      const compactAbs = resolveInsideDir(pluginDir, compactPath);
+      assert(isFile(compactAbs), `apps[${appId}].entry.compact.path must be a file: ${compactPath}`);
+    }
+
     // Basic ai path boundary checks (full schema is defined in docs; this validates the security boundary).
     const ai = app?.ai;
     const aiObj =

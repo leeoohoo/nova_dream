@@ -5,6 +5,12 @@ const manifestVersionSchema = z.number().int().min(1).max(1).optional().default(
 const moduleEntrySchema = z.object({
   type: z.literal('module'),
   path: z.string().trim().min(1, 'entry.path is required for module apps'),
+  compact: z
+    .object({
+      type: z.literal('module').optional().default('module'),
+      path: z.string().trim().min(1, 'entry.compact.path is required for module apps'),
+    })
+    .optional(),
 });
 
 const entrySchema = moduleEntrySchema;

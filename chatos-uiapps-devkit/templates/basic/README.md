@@ -6,6 +6,7 @@
 
 - `plugin/plugin.json`：插件清单（应用列表、入口、后端、AI 贡献）
 - `plugin/apps/__APP_ID__/index.mjs`：**module 入口**（导出 `mount({ container, host, slots })`）
+- `plugin/apps/__APP_ID__/compact.mjs`：**compact 入口**（可选；用于侧边抽屉/分栏场景）
 - `plugin/backend/index.mjs`：**插件后端**（导出 `createUiAppsBackend(ctx)`，通过 `host.backend.invoke()` 调用）
 - `plugin/apps/__APP_ID__/mcp-server.mjs`：应用自带 MCP Server（可选）
 - `plugin/apps/__APP_ID__/mcp-prompt.zh.md` / `.en.md`：MCP Prompt（可选）
@@ -32,6 +33,7 @@ npm run dev
 ## 开发清单（建议）
 
 - `plugin/plugin.json`：`apps[i].entry.type` 必须是 `module`，且 `path` 在插件目录内。
+- `plugin/plugin.json`：可选 `apps[i].entry.compact.path`，用于 compact UI。
 - `mount()`：返回卸载函数并清理事件/订阅；滚动放在应用内部，固定内容用 `slots.header`。
 - 主题：用 `host.theme.*` 与 `--ds-*` tokens；避免硬编码颜色。
 - 宿主能力：先判断 `host.bridge.enabled`，非宿主环境要可降级运行。

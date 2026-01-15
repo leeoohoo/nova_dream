@@ -11,7 +11,7 @@ import { ChatView as BaseChatView } from '@leeoohoo/common/aide-ui/features/chat
 import { AppsHubView } from '../apps/AppsHubView.jsx';
 import { AppsPluginView } from '../apps/AppsPluginView.jsx';
 
-const DEFAULT_DRAWER_WIDTH = 420;
+const DEFAULT_DRAWER_WIDTH = 520;
 
 function decodeRouteSegment(value) {
   if (typeof value !== 'string') return '';
@@ -66,118 +66,119 @@ export function ChatView({ admin, onNavigate }) {
   const drawerStyle = useMemo(() => {
     const width = drawerFullscreen ? '100%' : DEFAULT_DRAWER_WIDTH;
     return {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
       width,
+      minWidth: drawerFullscreen ? 0 : DEFAULT_DRAWER_WIDTH,
       maxWidth: '100%',
+      flex: drawerFullscreen ? '1 1 auto' : '0 0 auto',
       background: 'var(--ds-panel-bg)',
       borderLeft: drawerFullscreen ? 'none' : '1px solid var(--ds-panel-border)',
       boxShadow: 'var(--ds-panel-shadow)',
-      transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
-      transition: 'transform 0.18s ease-out',
       display: 'flex',
       flexDirection: 'column',
-      zIndex: 20,
-      pointerEvents: drawerOpen ? 'auto' : 'none',
+      minHeight: 0,
     };
-  }, [drawerFullscreen, drawerOpen]);
+  }, [drawerFullscreen]);
 
   return (
-    <div style={{ position: 'relative', height: '100%', minHeight: 0 }}>
-      <BaseChatView admin={admin} />
-
-      {!drawerOpen ? (
-        <Tooltip title="Apps">
-          <Button
-            type="primary"
-            size="small"
-            icon={<AppstoreOutlined />}
-            onClick={() => setDrawerOpen(true)}
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              borderRadius: '6px 0 0 6px',
-              zIndex: 10,
-            }}
-          />
-        </Tooltip>
-      ) : null}
-
-      <div style={drawerStyle} aria-hidden={!drawerOpen}>
-        <div
-          style={{
-            padding: '10px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            borderBottom: '1px solid var(--ds-panel-border)',
-            background: 'var(--ds-subtle-bg)',
-          }}
-        >
-          <AppstoreOutlined />
-          <span style={{ fontWeight: 600 }}>{showApp ? 'App' : 'Apps'}</span>
-          <div style={{ flex: 1 }} />
-          <Space size={6}>
-            {showApp ? (
-              <Tooltip title={drawerFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
-                <Button
-                  size="small"
-                  icon={<DoubleLeftOutlined />}
-                  onClick={() => setDrawerFullscreen((prev) => !prev)}
-                />
-              </Tooltip>
-            ) : null}
-            <Tooltip title="Collapse">
+    <div style={{ position: 'relative', height: '100%', minHeight: 0, display: 'flex', gap: 12 }}>
+      {!drawerFullscreen ? (
+        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          <BaseChatView admin={admin} />
+          {!drawerOpen ? (
+            <Tooltip title="Apps">
               <Button
+                type="primary"
                 size="small"
-                icon={<DoubleRightOutlined />}
-                onClick={() => {
-                  setDrawerOpen(false);
-                  setDrawerFullscreen(false);
+                icon={<AppstoreOutlined />}
+                onClick={() => setDrawerOpen(true)}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: 16,
+                  borderRadius: 8,
+                  zIndex: 10,
                 }}
               />
             </Tooltip>
-          </Space>
+          ) : null}
         </div>
+      ) : null}
 
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12 }}>
-          {showApp ? (
-            <AppsPluginView
-              pluginId={activeApp.pluginId}
-              appId={activeApp.appId}
-              onNavigate={handleDrawerNavigate}
-            />
-          ) : (
-            <AppsHubView onNavigate={handleDrawerNavigate} />
-          )}
-        </div>
-
-        <div
-          style={{
-            padding: '10px 12px',
-            borderTop: '1px solid var(--ds-panel-border)',
-            background: 'var(--ds-subtle-bg)',
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Button
-            size="small"
-            icon={<HomeOutlined />}
-            onClick={() => {
-              setActiveApp(null);
-              setDrawerFullscreen(false);
+      {drawerOpen ? (
+        <div style={drawerStyle} aria-hidden={!drawerOpen}>
+          <div
+            style={{
+              padding: '10px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              borderBottom: '1px solid var(--ds-panel-border)',
+              background: 'var(--ds-subtle-bg)',
             }}
-            disabled={!showApp}
           >
-            Home
-          </Button>
+            <AppstoreOutlined />
+            <span style={{ fontWeight: 600 }}>{showApp ? 'App' : 'Apps'}</span>
+            <div style={{ flex: 1 }} />
+            <Space size={6}>
+              {showApp ? (
+                <Tooltip title={drawerFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
+                  <Button
+                    size="small"
+                    icon={<DoubleLeftOutlined />}
+                    onClick={() => setDrawerFullscreen((prev) => !prev)}
+                  />
+                </Tooltip>
+              ) : null}
+              <Tooltip title="Collapse">
+                <Button
+                  size="small"
+                  icon={<DoubleRightOutlined />}
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    setDrawerFullscreen(false);
+                  }}
+                />
+              </Tooltip>
+            </Space>
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: 12 }}>
+            {showApp ? (
+              <AppsPluginView
+                pluginId={activeApp.pluginId}
+                appId={activeApp.appId}
+                onNavigate={handleDrawerNavigate}
+                surface={drawerFullscreen ? 'full' : 'compact'}
+                onRequestFullscreen={() => setDrawerFullscreen(true)}
+              />
+            ) : (
+              <AppsHubView onNavigate={handleDrawerNavigate} />
+            )}
+          </div>
+
+          <div
+            style={{
+              padding: '10px 12px',
+              borderTop: '1px solid var(--ds-panel-border)',
+              background: 'var(--ds-subtle-bg)',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <Button
+              size="small"
+              icon={<HomeOutlined />}
+              onClick={() => {
+                setActiveApp(null);
+                setDrawerFullscreen(false);
+              }}
+              disabled={!showApp}
+            >
+              Home
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

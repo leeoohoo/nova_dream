@@ -13,7 +13,7 @@ function normalizeBuiltinCliTab(value) {
   return 'session';
 }
 
-export function AppsPluginView({ pluginId, appId, onNavigate }) {
+export function AppsPluginView({ pluginId, appId, onNavigate, surface = 'full', onRequestFullscreen }) {
   const { loading, error, data, refresh } = useUiAppsRegistry();
   const apps = useMemo(() => (Array.isArray(data?.apps) ? data.apps : []), [data]);
   const iframeRef = useRef(null);
@@ -39,10 +39,15 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
     [apps, pluginId, appId]
   );
 
-  const entryUrl = typeof app?.entry?.url === 'string' ? app.entry.url : '';
-  const entryType = typeof app?.entry?.type === 'string' ? app.entry.type : 'iframe';
+  const surfaceMode = surface === 'compact' ? 'compact' : 'full';
+  const baseEntry = app?.entry || null;
+  const compactEntry = baseEntry?.compact || null;
+  const activeEntry = surfaceMode === 'compact' ? compactEntry : baseEntry;
+  const entryUrl = typeof activeEntry?.url === 'string' ? activeEntry.url : '';
+  const entryType = typeof activeEntry?.type === 'string' ? activeEntry.type : 'iframe';
   const isModuleApp = entryType === 'module';
   const hostBridgeEnabled = entryType !== 'url' && entryUrl.startsWith('file://');
+  const compactMissing = surfaceMode === 'compact' && Boolean(app) && !compactEntry;
 
   useEffect(() => {
     if (!isBuiltinCliConsole) return undefined;
@@ -176,7 +181,13 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
     const host = {
       bridge: { enabled: hostBridgeEnabled && hasApi },
       context: {
-        get: () => ({ pluginId, appId, theme: getTheme(), bridge: { enabled: hostBridgeEnabled && hasApi } }),
+        get: () => ({
+          pluginId,
+          appId,
+          theme: getTheme(),
+          surface: surfaceMode,
+          bridge: { enabled: hostBridgeEnabled && hasApi },
+        }),
       },
       theme: { get: getTheme, onChange: onThemeChange },
       admin: {
@@ -221,6 +232,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
         },
       },
       ui: {
+        surface: surfaceMode,
         navigate: (menu) => {
           const target = typeof menu === 'string' ? menu.trim() : '';
           if (!target) throw new Error('menu is required');
@@ -477,7 +489,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
         chatEventsFilterRef.current = { sessionId: '', types: null };
       }
     };
-  }, [appId, entryUrl, hostBridgeEnabled, isModuleApp, onNavigate, pluginId, reloadToken]);
+  }, [appId, entryUrl, hostBridgeEnabled, isModuleApp, onNavigate, pluginId, reloadToken, surfaceMode]);
 
   useEffect(() => {
     const handleMessage = async (event) => {
@@ -984,7 +996,19 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
 
       <Card size="small" style={{ flex: 1, minHeight: 0, borderRadius: 14 }} styles={{ body: { padding: 0, height: '100%' } }}>
         <div style={{ height: '100%', minHeight: 0 }}>
-          {app?.entry?.url ? (
+          {compactMissing ? (
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Alert type="info" showIcon message="This app only provides a fullscreen UI." />
+              <Button
+                type="primary"
+                onClick={() => {
+                  if (typeof onRequestFullscreen === 'function') onRequestFullscreen();
+                }}
+              >
+                Open Fullscreen
+              </Button>
+            </div>
+          ) : entryUrl ? (
             isModuleApp ? (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 {moduleStatus?.error ? (
@@ -1004,7 +1028,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
                 key={reloadToken}
                 ref={iframeRef}
                 title={app?.name || `${pluginId}:${appId}`}
-                src={app.entry.url}
+                src={entryUrl}
                 style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
                 onLoad={() => {
                   try {
@@ -1014,7 +1038,7 @@ export function AppsPluginView({ pluginId, appId, onNavigate }) {
                         __aideui: 'apps',
                         type: 'event',
                         event: 'host.ready',
-                        payload: { pluginId, appId, theme, bridge: { enabled: hostBridgeEnabled } },
+                        payload: { pluginId, appId, theme, surface: surfaceMode, bridge: { enabled: hostBridgeEnabled } },
                       },
                       '*'
                     );

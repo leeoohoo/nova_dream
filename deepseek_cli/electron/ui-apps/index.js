@@ -412,14 +412,26 @@ class UiAppsManager {
       seenIds.add(appId);
 
       try {
-        const entry = this.#resolveEntry(pluginDir, app.entry);
+        const entry = this.#resolveEntry(pluginDir, app.entry, 'entry.path');
+        let compactEntry = null;
+        if (app?.entry?.compact) {
+          try {
+            compactEntry = this.#resolveEntry(pluginDir, app.entry.compact, 'entry.compact.path');
+          } catch (err) {
+            errors.push({
+              dir: pluginDir,
+              source: 'entry',
+              message: `App "${plugin?.id}:${appId}" compact entry error: ${err?.message || String(err)}`,
+            });
+          }
+        }
         const ai = this.#resolveAi(pluginDir, plugin?.id, app, errors);
         apps.push({
           id: app.id,
           name: app.name,
           description: app.description || '',
           icon: app.icon || '',
-          entry,
+          entry: compactEntry ? { ...entry, compact: compactEntry } : entry,
           ai,
           route: `apps/plugin/${encodeURIComponent(plugin.id)}/${encodeURIComponent(app.id)}`,
         });
@@ -1302,30 +1314,30 @@ class UiAppsManager {
     return { entry: rel, resolved, mtimeMs: stat.mtimeMs };
   }
 
-  #resolveEntry(pluginDir, entry) {
+  #resolveEntry(pluginDir, entry, label = 'entry.path') {
     const entryType = entry?.type;
     if (entryType !== 'module') {
       throw new Error('Only "module" entry type is supported');
     }
     const relPath = typeof entry?.path === 'string' ? entry.path.trim() : '';
-    if (!relPath) throw new Error('entry.path is required');
+    if (!relPath) throw new Error(`${label} is required`);
     const resolved = path.resolve(pluginDir, relPath);
     const relative = path.relative(pluginDir, resolved);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new Error('entry.path must be within plugin directory');
+      throw new Error(`${label} must be within plugin directory`);
     }
     if (!fs.existsSync(resolved)) {
-      throw new Error(`entry.path not found: ${relPath}`);
+      throw new Error(`${label} not found: ${relPath}`);
     }
 
     let stat = null;
     try {
       stat = fs.statSync(resolved);
     } catch {
-      throw new Error(`entry.path not found: ${relPath}`);
+      throw new Error(`${label} not found: ${relPath}`);
     }
     if (!stat.isFile()) {
-      throw new Error(`entry.path must be a file for module apps: ${relPath}`);
+      throw new Error(`${label} must be a file for module apps: ${relPath}`);
     }
 
     return { type: 'module', url: pathToFileURL(resolved).toString() };

@@ -13,6 +13,7 @@ npm run dev
 
 - `plugin/plugin.json`：插件清单（应用列表、入口、后端、AI 贡献）
 - `plugin/apps/__APP_ID__/`：前端 module（浏览器环境，导出 `mount({ container, host, slots })`）
+- `plugin/apps/__APP_ID__/compact.mjs`：compact 入口（可选；用于侧边抽屉/分栏场景）
 - `plugin/backend/`：插件后端（Node/Electron main，导出 `createUiAppsBackend(ctx)`）
 - `plugin/shared/`：共享存储实现（后端持久化所需）
 - `docs/`：协议文档快照（随工程分发）
@@ -27,6 +28,7 @@ npm run dev
 ## 开发清单（建议）
 
 - `plugin/plugin.json`：`apps[i].entry.type` 必须是 `module`，且 `path` 在插件目录内。
+- `plugin/plugin.json`：可选 `apps[i].entry.compact.path`，用于 compact UI。
 - `mount()`：返回卸载函数并清理事件/订阅；滚动放在应用内部，固定内容用 `slots.header`。
 - 主题：用 `host.theme.*` 与 `--ds-*` tokens；避免硬编码颜色。
 - 宿主能力：先判断 `host.bridge.enabled`，非宿主环境要可降级运行。
