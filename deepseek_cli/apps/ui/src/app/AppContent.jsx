@@ -114,7 +114,7 @@ export function AppContent({
   if (currentMenu === 'chat/session') {
     return (
       <div style={{ flex: 1, minHeight: 0 }}>
-        <ChatView admin={admin} />
+        <ChatView admin={admin} onNavigate={navigate} />
       </div>
     );
   }

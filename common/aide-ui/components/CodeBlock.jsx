@@ -59,7 +59,9 @@ export function CodeBlock({
   }, [highlight]);
   if (text === null || text === undefined) return <Text type="secondary">无更多详情</Text>;
   const content = typeof text === 'string' ? text : String(text);
-  const lineCount = content.split('\n').length;
+  const lines = useMemo(() => content.split('\n'), [content]);
+  const lineCount = lines.length;
+  const hasLongLine = useMemo(() => lines.some((line) => line.length > 200), [lines]);
   const tooLong = content.length > 320 || lineCount > 8;
   const limited = !(alwaysExpanded || expanded);
   const highlightTooLarge = highlight && content.length > MAX_HIGHLIGHT_CHARS;
@@ -71,9 +73,12 @@ export function CodeBlock({
   const useHighlight = Boolean(highlightEnabled && highlightedHtml);
   const showFooterActions = true;
 
-  const effectiveWrap = showLineNumbers ? false : wrap;
+  const useLineNumbers = showLineNumbers && !hasLongLine;
+  const shouldWrap = wrap || hasLongLine;
+  const effectiveWrap = useLineNumbers ? false : shouldWrap;
   const heightConstrained = limited || constrainHeight;
   const overflowY = heightConstrained ? (disableScroll ? 'hidden' : 'auto') : 'visible';
+  const wordBreak = effectiveWrap ? (hasLongLine ? 'break-all' : 'break-word') : 'normal';
   const preStyle = {
     margin: 0,
     background: 'var(--ds-code-bg)',
@@ -85,18 +90,22 @@ export function CodeBlock({
     lineHeight: '18px',
     color: 'var(--ds-code-text)',
     whiteSpace: effectiveWrap ? 'pre-wrap' : 'pre',
-    wordBreak: effectiveWrap ? 'break-word' : 'normal',
+    wordBreak,
+    overflowWrap: effectiveWrap ? 'anywhere' : 'normal',
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     maxHeight: heightConstrained ? maxHeight : undefined,
     overflowY,
-    overflowX: heightConstrained ? (effectiveWrap ? 'hidden' : 'auto') : 'visible',
+    overflowX: 'auto',
   };
 
   const lineNumberText = useMemo(() => {
-    if (!showLineNumbers) return '';
+    if (!useLineNumbers) return '';
     const count = Math.max(1, lineCount);
     const width = String(count).length;
     return Array.from({ length: count }, (_, idx) => String(idx + 1).padStart(width, ' ')).join('\n');
-  }, [showLineNumbers, lineCount]);
+  }, [useLineNumbers, lineCount]);
 
   const onCopy = async () => {
     if (copying) return;
@@ -112,8 +121,8 @@ export function CodeBlock({
   };
 
   return (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
-      {showLineNumbers ? (
+    <Space direction="vertical" size={4} style={{ width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      {useLineNumbers ? (
         <div
           style={{
             margin: 0,
@@ -123,6 +132,7 @@ export function CodeBlock({
             fontFamily: 'SFMono-Regular, Consolas, Menlo, monospace',
             fontSize: 12,
             lineHeight: '18px',
+            maxWidth: '100%',
             maxHeight: heightConstrained ? maxHeight : undefined,
             overflowY,
             overflowX: 'hidden',

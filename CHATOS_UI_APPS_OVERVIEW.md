@@ -76,6 +76,7 @@
 为避免插件越权读取宿主文件系统，宿主对“路径型字段”做了强约束：
 
 - `apps[i].entry.path` 必须位于插件目录内，且必须是文件（`module` 入口）。
+- `apps[i].entry.compact.path`（可选）同样必须位于插件目录内，且必须是文件。
 - `backend.entry` 必须位于插件目录内，且必须是文件。
 - `apps[i].ai.config`、`ai.mcp.entry`、`ai.mcpPrompt.*.path` 等所有 path 都必须位于插件目录内。
 
@@ -87,7 +88,7 @@
 ## 最短接入路径（TL;DR）
 
 1) 从模板复制：`deepseek_cli/ui_apps/template/basic-plugin` → 放进任一插件目录  
-2) 修改 `plugin.json`：只支持 `apps[i].entry.type="module"`  
+2) 修改 `plugin.json`：只支持 `apps[i].entry.type="module"`（可选增加 `entry.compact` 作为紧凑 UI 入口）  
 3) 桌面端打开「应用」页 → 点“刷新” → 进入你的应用  
 4) （可选）需要 Node 能力：加 `backend.entry`，前端用 `host.backend.invoke()`  
 5) （可选）需要给 Agent 暴露工具/说明：配置 `apps[i].ai`（见 [`CHATOS_UI_APPS_AI_CONTRIBUTIONS.md`](./CHATOS_UI_APPS_AI_CONTRIBUTIONS.md)）

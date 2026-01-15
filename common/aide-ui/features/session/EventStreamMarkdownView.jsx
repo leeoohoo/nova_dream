@@ -34,6 +34,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
   const ignoreScrollRef = useRef(false);
   const nextScrollBehaviorRef = useRef('auto');
   const lastUpdated = list.length > 0 ? list[list.length - 1].tsText : null;
+  const codeBlockClampStyle = { width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto' };
 
   const toggleDetails = (key) => {
     setExpandedDetails((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -134,16 +135,16 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
         </Space>
       }
       style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}
-      bodyStyle={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+      bodyStyle={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}
     >
-      <Space size="small" wrap style={{ marginBottom: 12 }}>
+      <Space size="small" wrap style={{ marginBottom: 12, width: '100%', minWidth: 0 }}>
         {lastUpdated ? (
           <Text type="secondary" style={{ fontSize: 12 }}>
             最新事件：{lastUpdated}
           </Text>
         ) : null}
       </Space>
-      <Space size="small" wrap style={{ marginBottom: 12 }}>
+      <Space size="small" wrap style={{ marginBottom: 12, width: '100%', minWidth: 0 }}>
         <Select
           value={runFilter || RUN_FILTER_ALL}
           onChange={(val) => (typeof onRunFilterChange === 'function' ? onRunFilterChange(val) : null)}
@@ -182,7 +183,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+        style={{ flex: 1, minHeight: 0, minWidth: 0, maxWidth: '100%', overflow: 'auto' }}
       >
         <List
           itemLayout="vertical"
@@ -199,16 +200,16 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
             const markdown = buildEventMarkdown(item);
 
             return (
-              <List.Item key={item.key} style={{ paddingLeft: 0, paddingRight: 0 }}>
-                <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                    <Space align="start" style={{ justifyContent: 'space-between', width: '100%' }}>
-                    <Space size={8} wrap>
+              <List.Item key={item.key} style={{ paddingLeft: 0, paddingRight: 0, minWidth: 0 }}>
+                <Space direction="vertical" size={8} style={{ width: '100%', minWidth: 0 }}>
+                    <Space align="start" wrap style={{ justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
+                    <Space size={8} wrap style={{ flex: 1, minWidth: 0 }}>
                       <Tag color={item.meta?.color || 'default'}>{item.meta?.label || item.type}</Tag>
                       {toolLabel ? <Tag color="purple">tool: {toolLabel}</Tag> : null}
                       {item.payload?.agent ? <Tag color="magenta">agent: {item.payload.agent}</Tag> : null}
                       {rid ? <Tag color="geekblue">run: {rid}</Tag> : null}
                     </Space>
-                    <Space size={8} align="center">
+                    <Space size={8} align="center" style={{ flexShrink: 0 }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {item.tsText}
                       </Text>
@@ -221,17 +222,21 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
                   {markdown ? <MarkdownBlock text={markdown} alwaysExpanded /> : <Text type="secondary">无内容</Text>}
 
                   {expanded ? (
-                    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                    <Space direction="vertical" size={6} style={{ width: '100%', minWidth: 0 }}>
                       {isToolLike ? (
                         <>
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             args
                           </Text>
-                          <CodeBlock text={formatJson(item?.payload?.args) || '无 args'} maxHeight={220} highlight />
+                          <div style={codeBlockClampStyle}>
+                            <CodeBlock text={formatJson(item?.payload?.args) || '无 args'} maxHeight={220} highlight />
+                          </div>
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             result
                           </Text>
-                          <CodeBlock text={formatJson(item?.payload?.result) || '无 result'} maxHeight={260} highlight />
+                          <div style={codeBlockClampStyle}>
+                            <CodeBlock text={formatJson(item?.payload?.result) || '无 result'} maxHeight={260} highlight />
+                          </div>
                         </>
                       ) : null}
                       {collapsible || !isToolLike ? (
@@ -240,14 +245,22 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
                             payload / event
                           </Text>
                           {payloadJson ? (
-                            <CodeBlock text={payloadJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={payloadJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : eventJson ? (
-                            <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : (
-                            <CodeBlock text="无更多详情" maxHeight={260} />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text="无更多详情" maxHeight={260} />
+                            </div>
                           )}
                           {eventJson && eventJson !== payloadJson ? (
-                            <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            <div style={codeBlockClampStyle}>
+                              <CodeBlock text={eventJson} maxHeight={260} highlight language="json" />
+                            </div>
                           ) : null}
                         </>
                       ) : null}
@@ -289,7 +302,7 @@ function EventStreamMarkdown({ events, onRefresh, runFilter, runOptions, onRunFi
               }
             },
           }}
-          style={{ minHeight: 0 }}
+          style={{ minHeight: 0, minWidth: 0, width: '100%' }}
         />
       </div>
     </Card>

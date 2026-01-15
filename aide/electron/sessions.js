@@ -22,6 +22,8 @@ const execAsync = promisify(exec);
 const DEFAULT_STOP_TIMEOUT_MS = 4000;
 const DEFAULT_POLL_INTERVAL_MS = 200;
 const PS_MAX_BUFFER = 8 * 1024 * 1024;
+const PORT_SCAN_LINES = 140;
+const PORT_SCAN_BYTES = 128 * 1024;
 const DEFAULT_SESSION_SHELL =
   process.platform === 'win32'
     ? process.env.COMSPEC || process.env.ComSpec || 'cmd.exe'
@@ -414,6 +416,65 @@ function isSessionAlive(pid, pgid) {
   return false;
 }
 
+function normalizePort(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  const port = Math.trunc(num);
+  if (port <= 0 || port > 65535) return null;
+  return port;
+}
+
+function appendPort(list, value) {
+  const port = normalizePort(value);
+  if (!port) return;
+  if (!list.includes(port)) {
+    list.push(port);
+  }
+}
+
+function extractPortsFromText(text) {
+  const ports = [];
+  const source = String(text || '');
+  if (!source) return ports;
+
+  const patterns = [
+    /https?:\/\/(?:\[[^\]]+\]|[^\s/:]+):(\d{2,5})/gi,
+    /\b(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::|\s+)(\d{2,5})\b/gi,
+    /\bport\s*(?:=|:)?\s*(\d{2,5})\b/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(source))) {
+      appendPort(ports, match[1]);
+    }
+  }
+
+  return ports;
+}
+
+function extractPortsFromCommand(command) {
+  const ports = [];
+  const source = String(command || '');
+  if (!source) return ports;
+
+  const patterns = [
+    /(?:^|\s)--port(?:=|\s+)(\d{2,5})\b/g,
+    /(?:^|\s)-p(?:=|\s+)?(\d{2,5})(?::\d{2,5})?\b/g,
+    /(?:^|\s)PORT\s*=\s*(\d{2,5})\b/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(source))) {
+      appendPort(ports, match[1]);
+    }
+  }
+
+  extractPortsFromText(source).forEach((port) => appendPort(ports, port));
+  return ports;
+}
+
 async function waitForPidExit(pid, timeoutMs = DEFAULT_STOP_TIMEOUT_MS, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
   const num = Number(pid);
   if (!Number.isFinite(num) || num <= 0) return true;
@@ -549,7 +610,18 @@ export async function listSessions({ sessionRoot } = {}) {
         }
       }
 
-      sessions.push({ ...status, running, resolvedPid, resolvedPgid, recovered });
+      const ports = [];
+      const outputPath = typeof status?.outputPath === 'string' ? status.outputPath : '';
+      if (running && outputPath) {
+        const tail = readLastLinesFromFile(outputPath, PORT_SCAN_LINES, PORT_SCAN_BYTES);
+        extractPortsFromText(tail).forEach((port) => appendPort(ports, port));
+      }
+      if (ports.length === 0) {
+        extractPortsFromCommand(status?.command).forEach((port) => appendPort(ports, port));
+      }
+      const port = ports.length > 0 ? ports[0] : null;
+
+      sessions.push({ ...status, running, resolvedPid, resolvedPgid, recovered, port, ports });
     }
     sessions.sort((a, b) => String(b.startedAt || '').localeCompare(String(a.startedAt || '')));
     return { available: true, platform, sessionsDir, sessions };

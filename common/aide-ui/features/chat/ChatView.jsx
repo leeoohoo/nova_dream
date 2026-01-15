@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Input, Layout, Modal, Select, Space, Spin, Tag, Typography } from 'antd';
-import { CloseCircleOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, Input, Layout, Modal, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
+import { CloseCircleOutlined, FolderOpenOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 
 import { api, hasApi } from '../../lib/api.js';
 import { parseTasks } from '../../lib/parse.js';
@@ -18,7 +18,7 @@ function normalizeId(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-export function ChatView({ admin }) {
+export function ChatView({ admin, sidebarCollapsed: sidebarCollapsedProp, onSidebarCollapsedChange }) {
   const controller = useChatController({ admin });
   const {
     loading,
@@ -55,6 +55,21 @@ export function ChatView({ admin }) {
   const tasksBaselineSessionIdRef = useRef('');
   const tasksBaselineIdsRef = useRef(new Set());
   const tasksBaselineReadyRef = useRef(false);
+  const [localSidebarCollapsed, setLocalSidebarCollapsed] = useState(false);
+
+  const sidebarCollapsed = typeof sidebarCollapsedProp === 'boolean' ? sidebarCollapsedProp : localSidebarCollapsed;
+  const setSidebarCollapsed = useCallback(
+    (next) => {
+      const value = Boolean(next);
+      if (typeof sidebarCollapsedProp === 'boolean') {
+        onSidebarCollapsedChange?.(value);
+        return;
+      }
+      setLocalSidebarCollapsed(value);
+      onSidebarCollapsedChange?.(value);
+    },
+    [sidebarCollapsedProp, onSidebarCollapsedChange]
+  );
 
   const models = useMemo(() => (Array.isArray(admin?.models) ? admin.models : []), [admin]);
   const modelById = useMemo(() => new Map(models.map((m) => [normalizeId(m?.id), m])), [models]);
@@ -174,7 +189,17 @@ export function ChatView({ admin }) {
   return (
     <>
       <Layout style={{ height: '100%', minHeight: 0 }}>
-        <Sider width={320} style={{ background: 'var(--ds-panel-bg)', borderRight: '1px solid var(--ds-panel-border)' }}>
+        <Sider
+          width={320}
+          collapsed={sidebarCollapsed}
+          collapsedWidth={0}
+          collapsible
+          trigger={null}
+          style={{
+            background: 'var(--ds-panel-bg)',
+            borderRight: sidebarCollapsed ? 'none' : '1px solid var(--ds-panel-border)',
+          }}
+        >
           <ChatSidebar
             sessions={sessions}
             selectedSessionId={selectedSessionId}
@@ -202,6 +227,7 @@ export function ChatView({ admin }) {
               }
             }}
             onRefresh={refreshAll}
+            onCollapse={() => setSidebarCollapsed(true)}
           />
         </Sider>
         <Content
@@ -213,102 +239,114 @@ export function ChatView({ admin }) {
             minHeight: 0,
           }}
         >
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              borderRadius: 16,
-              overflow: 'hidden',
-              background: 'var(--ds-panel-bg)',
-              border: '1px solid var(--ds-panel-border)',
-              boxShadow: 'var(--ds-panel-shadow)',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div style={{ padding: 12, borderBottom: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
-              <ChatSessionHeader session={currentSession} streaming={Boolean(streamState)} />
-            </div>
-
-            <div style={{ flex: 1, minHeight: 0, padding: 12 }}>
-              <ChatMessages
-                messages={messages}
-                streaming={streamState}
-                hasMore={messagesHasMore}
-                loadingMore={loadingMore}
-                onLoadMore={loadMoreMessages}
-              />
-            </div>
-
-            <div style={{ padding: 12, borderTop: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
-                <Space size={8} align="center" wrap>
-                  <Text type="secondary">当前 Agent</Text>
-                  <Select
-                    value={selectedAgentId || undefined}
-                    placeholder="选择 Agent"
-                    options={agentOptions}
-                    onChange={(agentId) => {
-                      void (async () => {
-                        try {
-                          await changeAgent(agentId);
-                        } catch {
-                          // changeAgent already toasts
-                        }
-                      })();
-                    }}
-                    disabled={Boolean(streamState)}
-                    style={{ minWidth: 220 }}
-                  />
-                </Space>
-
-                <div style={{ flex: 1 }} />
-
-                <Space size={8} align="center" wrap>
-                  <Tag color="blue" style={{ marginRight: 0 }}>
-                    cwd
-                  </Tag>
-                  <Text type="secondary" ellipsis={{ tooltip: workspaceRootLabel }} style={{ maxWidth: 420 }}>
-                    {workspaceRootLabel}
-                  </Text>
-                  <Button
-                    size="small"
-                    icon={<FolderOpenOutlined />}
-                    onClick={() => setWorkspaceModalOpen(true)}
-                    disabled={Boolean(streamState)}
-                  >
-                    设置目录
-                  </Button>
-                  <Button
-                    size="small"
-                    icon={<CloseCircleOutlined />}
-                    onClick={() => clearWorkspaceRoot?.()}
-                    disabled={Boolean(streamState) || !workspaceRoot}
-                  >
-                    清除
-                  </Button>
-                  <Button size="small" onClick={() => setTasksWorkbenchOpen(true)}>
-                    任务 ({sessionTasks.length})
-                  </Button>
-                </Space>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {sidebarCollapsed ? (
+              <Tooltip title="展开会话">
+                <Button
+                  size="small"
+                  icon={<MenuUnfoldOutlined />}
+                  onClick={() => setSidebarCollapsed(false)}
+                  style={{ position: 'absolute', top: 0, left: 0, zIndex: 5 }}
+                />
+              </Tooltip>
+            ) : null}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                borderRadius: 16,
+                overflow: 'hidden',
+                background: 'var(--ds-panel-bg)',
+                border: '1px solid var(--ds-panel-border)',
+                boxShadow: 'var(--ds-panel-shadow)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div style={{ padding: 12, borderBottom: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
+                <ChatSessionHeader session={currentSession} streaming={Boolean(streamState)} />
               </div>
 
-              <ChatComposer
-                value={composerText}
-                onChange={setComposerText}
-                attachments={composerAttachments}
-                onAttachmentsChange={setComposerAttachments}
-                visionEnabled={visionEnabled}
-                onSend={async () => {
-                  try {
-                    await sendMessage();
-                  } catch {
-                    // sendMessage already toasts
-                  }
-                }}
-                onStop={stopStreaming}
-                sending={Boolean(streamState)}
-              />
+              <div style={{ flex: 1, minHeight: 0, padding: 12 }}>
+                <ChatMessages
+                  messages={messages}
+                  streaming={streamState}
+                  hasMore={messagesHasMore}
+                  loadingMore={loadingMore}
+                  onLoadMore={loadMoreMessages}
+                />
+              </div>
+
+              <div style={{ padding: 12, borderTop: '1px solid var(--ds-panel-border)', background: 'var(--ds-subtle-bg)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <Space size={8} align="center" wrap>
+                    <Text type="secondary">当前 Agent</Text>
+                    <Select
+                      value={selectedAgentId || undefined}
+                      placeholder="选择 Agent"
+                      options={agentOptions}
+                      onChange={(agentId) => {
+                        void (async () => {
+                          try {
+                            await changeAgent(agentId);
+                          } catch {
+                            // changeAgent already toasts
+                          }
+                        })();
+                      }}
+                      disabled={Boolean(streamState)}
+                      style={{ minWidth: 220 }}
+                    />
+                  </Space>
+
+                  <div style={{ flex: 1 }} />
+
+                  <Space size={8} align="center" wrap>
+                    <Tag color="blue" style={{ marginRight: 0 }}>
+                      cwd
+                    </Tag>
+                    <Text type="secondary" ellipsis={{ tooltip: workspaceRootLabel }} style={{ maxWidth: 420 }}>
+                      {workspaceRootLabel}
+                    </Text>
+                    <Button
+                      size="small"
+                      icon={<FolderOpenOutlined />}
+                      onClick={() => setWorkspaceModalOpen(true)}
+                      disabled={Boolean(streamState)}
+                    >
+                      设置目录
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<CloseCircleOutlined />}
+                      onClick={() => clearWorkspaceRoot?.()}
+                      disabled={Boolean(streamState) || !workspaceRoot}
+                    >
+                      清除
+                    </Button>
+                    <Button size="small" onClick={() => setTasksWorkbenchOpen(true)}>
+                      任务 ({sessionTasks.length})
+                    </Button>
+                  </Space>
+                </div>
+
+                <ChatComposer
+                  value={composerText}
+                  onChange={setComposerText}
+                  attachments={composerAttachments}
+                  onAttachmentsChange={setComposerAttachments}
+                  visionEnabled={visionEnabled}
+                  onSend={async () => {
+                    try {
+                      await sendMessage();
+                    } catch {
+                      // sendMessage already toasts
+                    }
+                  }}
+                  onStop={stopStreaming}
+                  sending={Boolean(streamState)}
+                />
+              </div>
             </div>
           </div>
         </Content>

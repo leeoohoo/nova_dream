@@ -9,7 +9,11 @@
       "id": "cli",
       "name": "AIDE 引擎",
       "description": "内置 CLI UI（会话 / 文件 / 轨迹 / 灵动岛）",
-      "entry": { "type": "module", "path": "cli/dist/index.mjs" },
+      "entry": {
+        "type": "module",
+        "path": "cli/dist/index.mjs",
+        "compact": { "type": "module", "path": "cli/compact.mjs" }
+      },
       "ai": { "mcpServers": true, "prompts": true }
     }
   ]

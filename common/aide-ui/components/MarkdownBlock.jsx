@@ -622,14 +622,17 @@ function renderBlockContent(block) {
     if (normalized === 'mermaid' || normalized === 'mmd' || (!normalized && looksLikeMermaid(block.text))) {
       return <MermaidDiagram text={block.text} />;
     }
+    const rawCode = typeof block.text === 'string' ? block.text : String(block.text ?? '');
+    const hasLongLine = rawCode.split('\n').some((line) => line.length > 200);
+    const wrapCode = hasLongLine;
     return (
       <CodeBlock
         text={block.text}
         maxHeight={320}
         highlight
         language={lang || undefined}
-        wrap={false}
-        showLineNumbers
+        wrap={wrapCode}
+        showLineNumbers={!wrapCode}
         disableScroll
       />
     );
@@ -790,12 +793,16 @@ export function MarkdownBlock({ text, maxHeight = 260, alwaysExpanded = false, c
   };
 
   return (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+    <Space direction="vertical" size={4} style={{ width: '100%', minWidth: 0 }}>
       <div
         style={{
           ...panelStyle,
           maxHeight: limited ? maxHeight : undefined,
-          overflow: limited ? 'auto' : 'visible',
+          overflowY: limited ? 'auto' : 'visible',
+          overflowX: 'auto',
+          maxWidth: '100%',
+          wordBreak: 'break-word',
+          overflowWrap: 'anywhere',
         }}
       >
         {blocks.length === 0

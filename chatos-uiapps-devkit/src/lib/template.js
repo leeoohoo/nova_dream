@@ -94,7 +94,11 @@ export function writeScaffoldManifest({ destPluginDir, pluginId, pluginName, ver
         id: appId,
         name: 'My App',
         description: 'A ChatOS module app.',
-        entry: { type: 'module', path: `apps/${appId}/index.mjs` },
+        entry: {
+          type: 'module',
+          path: `apps/${appId}/index.mjs`,
+          compact: { type: 'module', path: `apps/${appId}/compact.mjs` },
+        },
         ai: {
           // Keep the default scaffold dependency-free: prompt is safe, MCP server is opt-in.
           mcpPrompt: {

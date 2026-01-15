@@ -39,6 +39,12 @@ export function mount({ container, host, slots }) {
 - 不要使用 `window/body` 作为滚动容器；把滚动放到应用内部。
 - 将 Tabs/二级导航/操作按钮等放到 `slots.header`，可滚动内容放到 `container`。
 
+Surface 说明：
+
+- 宿主可能在不同 **surface** 下挂载应用（如 `full` 全屏、`compact` 侧边抽屉/分栏）。
+- 若 `plugin.json` 提供 `entry.compact`，宿主在 compact surface 会优先加载该入口。
+- 当前 surface 通过 `host.context.get().surface` 暴露（`"full"` / `"compact"`）。
+
 ## 2. Host Bridge 可用性
 
 宿主仅在“file-based entry + preload bridge 可用”的情况下提供 `host` 能力；否则会抛错：
@@ -51,7 +57,7 @@ export function mount({ container, host, slots }) {
 ### 3.1 上下文与主题
 
 - `host.bridge.enabled: boolean`
-- `host.context.get(): { pluginId, appId, theme, bridge: { enabled } }`
+- `host.context.get(): { pluginId, appId, theme, surface, bridge: { enabled } }`
 - `host.theme.get(): string`（当前实现读取 `document.documentElement.dataset.theme`）
 - `host.theme.onChange(listener): () => void`
 
@@ -96,6 +102,7 @@ export function mount({ container, host, slots }) {
 
 - `host.ui.navigate(menu: string): { ok: true }`
   - 用于跨应用/跨页面跳转（由宿主统一处理路由）
+- `host.ui.surface: "full" | "compact"`（当前 surface，等价于 `host.context.get().surface`）
 
 ### 3.7 Chat（Agents / Sessions / Messages / Send / Events）
 

@@ -8,6 +8,13 @@ const { Text } = Typography;
 function SessionsPanel({ data, loading, actionName, onRefresh, onKill, onRestart, onStop, onOpenLog, onKillAll }) {
   const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
   const sessionsDir = typeof data?.sessionsDir === 'string' ? data.sessionsDir : '';
+  const formatPorts = (record) => {
+    const ports = Array.isArray(record?.ports) ? record.ports : [];
+    if (ports.length > 0) return ports.join(', ');
+    const port = record?.port;
+    if (port === undefined || port === null || port === '') return '-';
+    return String(port);
+  };
   return (
     <Card
       title="后台会话"
@@ -58,6 +65,16 @@ function SessionsPanel({ data, loading, actionName, onRefresh, onKill, onRestart
                 const pid = typeof record?.resolvedPid === 'number' ? record.resolvedPid : record?.pid;
                 return typeof pid === 'number' ? String(pid) : '-';
               },
+            },
+            {
+              title: '端口',
+              dataIndex: 'port',
+              width: 120,
+              render: (_v, record) => (
+                <Text type="secondary" style={{ fontFamily: 'monospace' }}>
+                  {formatPorts(record)}
+                </Text>
+              ),
             },
             {
               title: '创建时间',
@@ -133,4 +150,3 @@ function SessionsPanel({ data, loading, actionName, onRefresh, onKill, onRestart
 }
 
 export { SessionsPanel };
-

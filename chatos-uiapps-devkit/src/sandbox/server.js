@@ -7,6 +7,31 @@ import { ensureDir, isDirectory, isFile } from '../lib/fs.js';
 import { loadPluginManifest, pickAppFromManifest } from '../lib/plugin.js';
 import { resolveInsideDir } from '../lib/path-boundary.js';
 
+const __filename = url.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const TOKEN_REGEX = /--ds-[a-z0-9-]+/gi;
+const GLOBAL_STYLES_CANDIDATES = [
+  path.resolve(__dirname, '..', '..', '..', 'common', 'aide-ui', 'components', 'GlobalStyles.jsx'),
+  path.resolve(process.cwd(), 'common', 'aide-ui', 'components', 'GlobalStyles.jsx'),
+];
+
+function loadTokenNames() {
+  for (const candidate of GLOBAL_STYLES_CANDIDATES) {
+    try {
+      if (!isFile(candidate)) continue;
+      const raw = fs.readFileSync(candidate, 'utf8');
+      const matches = raw.match(TOKEN_REGEX) || [];
+      const names = Array.from(new Set(matches.map((v) => v.toLowerCase())));
+      if (names.length > 0) return names.sort();
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
+
 function sendJson(res, status, obj) {
   const raw = JSON.stringify(obj);
   res.writeHead(status, {
@@ -135,30 +160,134 @@ function htmlPage() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChatOS UI Apps Sandbox</title>
     <style>
-      :root { color-scheme: light dark; }
-      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+      :root {
+        color-scheme: light;
+        --ds-accent: #00d4ff;
+        --ds-accent-2: #7c3aed;
+        --ds-panel-bg: rgba(255, 255, 255, 0.86);
+        --ds-panel-border: rgba(15, 23, 42, 0.08);
+        --ds-subtle-bg: rgba(255, 255, 255, 0.62);
+        --ds-selected-bg: linear-gradient(90deg, rgba(0, 212, 255, 0.14), rgba(124, 58, 237, 0.08));
+        --ds-focus-ring: rgba(0, 212, 255, 0.32);
+        --ds-nav-hover-bg: rgba(15, 23, 42, 0.06);
+        --ds-code-bg: #f7f9fb;
+        --ds-code-border: #eef2f7;
+        --sandbox-bg: #f5f7fb;
+        --sandbox-text: #111;
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+        --ds-accent: #00d4ff;
+        --ds-accent-2: #a855f7;
+        --ds-panel-bg: rgba(17, 19, 28, 0.82);
+        --ds-panel-border: rgba(255, 255, 255, 0.14);
+        --ds-subtle-bg: rgba(255, 255, 255, 0.04);
+        --ds-selected-bg: linear-gradient(90deg, rgba(0, 212, 255, 0.18), rgba(168, 85, 247, 0.14));
+        --ds-focus-ring: rgba(0, 212, 255, 0.5);
+        --ds-nav-hover-bg: rgba(255, 255, 255, 0.08);
+        --ds-code-bg: #0d1117;
+        --ds-code-border: #30363d;
+        --sandbox-bg: #0f1115;
+        --sandbox-text: #eee;
+      }
+      body {
+        margin:0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        background: var(--sandbox-bg);
+        color: var(--sandbox-text);
+      }
       #appRoot { height: 100vh; display:flex; flex-direction:column; }
-      #sandboxToolbar { flex: 0 0 auto; border-bottom: 1px solid rgba(0,0,0,0.10); padding: 10px 12px; }
-      #headerSlot { flex: 0 0 auto; border-bottom: 1px solid rgba(0,0,0,0.08); padding: 10px 12px; }
+      #sandboxToolbar {
+        flex: 0 0 auto;
+        border-bottom: 1px solid var(--ds-panel-border);
+        padding: 10px 12px;
+        background: var(--ds-panel-bg);
+      }
+      #headerSlot {
+        flex: 0 0 auto;
+        border-bottom: 1px solid var(--ds-panel-border);
+        padding: 10px 12px;
+        background: var(--ds-panel-bg);
+      }
       #container { flex: 1 1 auto; min-height:0; overflow:hidden; }
       #containerInner { height:100%; overflow:auto; }
       .muted { opacity: 0.7; font-size: 12px; }
       .bar { display:flex; gap:10px; align-items:center; justify-content:space-between; }
-      .btn { border:1px solid rgba(0,0,0,0.14); background:rgba(0,0,0,0.04); padding:6px 10px; border-radius:10px; cursor:pointer; font-weight:650; }
-      .btn:active { transform: translateY(1px); }
-      #promptsPanel { position: fixed; right: 12px; bottom: 12px; width: 420px; max-height: 70vh; display:none; flex-direction:column; background:rgba(255,255,255,0.96); color:#111; border:1px solid rgba(0,0,0,0.18); border-radius:14px; overflow:hidden; box-shadow: 0 18px 60px rgba(0,0,0,0.18); }
-      @media (prefers-color-scheme: dark) {
-        #promptsPanel { background: rgba(17,17,17,0.92); color: #eee; border-color: rgba(255,255,255,0.18); }
-        #sandboxToolbar { border-bottom-color: rgba(255,255,255,0.12); }
-        #headerSlot { border-bottom-color: rgba(255,255,255,0.10); }
-        .btn { border-color: rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color:#eee; }
+      .btn {
+        border:1px solid var(--ds-panel-border);
+        background: var(--ds-subtle-bg);
+        padding:6px 10px;
+        border-radius:10px;
+        cursor:pointer;
+        font-weight:650;
+        color: inherit;
       }
-      #promptsPanelHeader { padding: 10px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid rgba(0,0,0,0.12); }
+      .btn[data-active='1'] {
+        background: var(--ds-selected-bg);
+        box-shadow: 0 0 0 2px var(--ds-focus-ring);
+      }
+      .btn:active { transform: translateY(1px); }
+      #promptsPanel {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        width: 420px;
+        max-height: 70vh;
+        display:none;
+        flex-direction:column;
+        background: var(--ds-panel-bg);
+        color: inherit;
+        border:1px solid var(--ds-panel-border);
+        border-radius:14px;
+        overflow:hidden;
+        box-shadow: 0 18px 60px rgba(0,0,0,0.18);
+      }
+      #promptsPanelHeader { padding: 10px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid var(--ds-panel-border); }
       #promptsPanelBody { padding: 10px 12px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
       #promptsFab { position: fixed; right: 16px; bottom: 16px; width: 44px; height: 44px; border-radius: 999px; display:flex; align-items:center; justify-content:center; }
-      .card { border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; padding: 10px; }
+      .card { border: 1px solid var(--ds-panel-border); border-radius: 12px; padding: 10px; background: var(--ds-panel-bg); }
       .row { display:flex; gap:10px; }
-      input, textarea, select { width:100%; padding:8px; border-radius:10px; border:1px solid rgba(0,0,0,0.14); background:rgba(0,0,0,0.03); color: inherit; }
+      .toolbar-group { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      .segmented { display:flex; gap:6px; align-items:center; }
+      #sandboxInspector {
+        position: fixed;
+        right: 12px;
+        top: 72px;
+        width: 360px;
+        max-height: 70vh;
+        display: none;
+        flex-direction: column;
+        background: var(--ds-panel-bg);
+        border: 1px solid var(--ds-panel-border);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 14px 40px rgba(0,0,0,0.16);
+        z-index: 10;
+      }
+      #sandboxInspectorHeader {
+        padding: 10px 12px;
+        display:flex;
+        align-items:center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--ds-panel-border);
+      }
+      #sandboxInspectorBody {
+        padding: 10px 12px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-title { font-size: 12px; font-weight: 700; opacity: 0.8; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; }
+      input, textarea, select {
+        width:100%;
+        padding:8px;
+        border-radius:10px;
+        border:1px solid var(--ds-panel-border);
+        background: var(--ds-subtle-bg);
+        color: inherit;
+      }
       textarea { min-height: 70px; resize: vertical; }
       label { font-size: 12px; opacity: 0.8; }
       .danger { border-color: rgba(255,0,0,0.35); }
@@ -172,7 +301,16 @@ function htmlPage() {
             <div style="font-weight:800">ChatOS UI Apps Sandbox</div>
             <div class="muted">Host API mock · 模拟 module mount({ container, host, slots })</div>
           </div>
-          <div class="row">
+          <div class="row toolbar-group">
+            <span class="muted">Theme</span>
+            <div class="segmented" role="group" aria-label="Theme">
+              <button id="btnThemeLight" class="btn" type="button">Light</button>
+              <button id="btnThemeDark" class="btn" type="button">Dark</button>
+              <button id="btnThemeSystem" class="btn" type="button">System</button>
+            </div>
+            <div id="themeStatus" class="muted"></div>
+            <div id="sandboxContext" class="muted"></div>
+            <button id="btnInspectorToggle" class="btn" type="button">Inspect</button>
             <button id="btnReload" class="btn" type="button">Reload</button>
           </div>
         </div>
@@ -191,6 +329,30 @@ function htmlPage() {
       <div id="promptsPanelBody"></div>
     </div>
 
+    <div id="sandboxInspector" aria-hidden="true">
+      <div id="sandboxInspectorHeader">
+        <div style="font-weight:800">Sandbox Inspector</div>
+        <div class="row">
+          <button id="btnInspectorRefresh" class="btn" type="button">Refresh</button>
+          <button id="btnInspectorClose" class="btn" type="button">Close</button>
+        </div>
+      </div>
+      <div id="sandboxInspectorBody">
+        <div>
+          <div class="section-title">Host Context</div>
+          <pre id="inspectorContext" class="mono"></pre>
+        </div>
+        <div>
+          <div class="section-title">Theme</div>
+          <pre id="inspectorTheme" class="mono"></pre>
+        </div>
+        <div>
+          <div class="section-title">Tokens</div>
+          <pre id="inspectorTokens" class="mono"></pre>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/sandbox.mjs"></script>
   </body>
 </html>`;
@@ -205,6 +367,18 @@ const fab = $('#promptsFab');
 const panel = $('#promptsPanel');
 const panelBody = $('#promptsPanelBody');
 const panelClose = $('#promptsClose');
+const btnThemeLight = $('#btnThemeLight');
+const btnThemeDark = $('#btnThemeDark');
+const btnThemeSystem = $('#btnThemeSystem');
+const themeStatus = $('#themeStatus');
+const sandboxContext = $('#sandboxContext');
+const btnInspectorToggle = $('#btnInspectorToggle');
+const sandboxInspector = $('#sandboxInspector');
+const btnInspectorClose = $('#btnInspectorClose');
+const btnInspectorRefresh = $('#btnInspectorRefresh');
+const inspectorContext = $('#inspectorContext');
+const inspectorTheme = $('#inspectorTheme');
+const inspectorTokens = $('#inspectorTokens');
 
 const setPanelOpen = (open) => { panel.style.display = open ? 'flex' : 'none'; };
 fab.addEventListener('click', () => setPanelOpen(panel.style.display !== 'flex'));
@@ -212,6 +386,168 @@ panelClose.addEventListener('click', () => setPanelOpen(false));
 window.addEventListener('chatos:uiPrompts:open', () => setPanelOpen(true));
 window.addEventListener('chatos:uiPrompts:close', () => setPanelOpen(false));
 window.addEventListener('chatos:uiPrompts:toggle', () => setPanelOpen(panel.style.display !== 'flex'));
+
+const THEME_STORAGE_KEY = 'chatos:sandbox:theme-mode';
+const themeListeners = new Set();
+const themeButtons = [
+  { mode: 'light', el: btnThemeLight },
+  { mode: 'dark', el: btnThemeDark },
+  { mode: 'system', el: btnThemeSystem },
+];
+const systemQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+const normalizeThemeMode = (mode) => (mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system');
+
+const loadThemeMode = () => {
+  try {
+    return normalizeThemeMode(String(localStorage.getItem(THEME_STORAGE_KEY) || ''));
+  } catch {
+    return 'system';
+  }
+};
+
+let themeMode = loadThemeMode();
+let currentTheme = 'light';
+let inspectorEnabled = false;
+let inspectorTimer = null;
+
+const resolveTheme = () => {
+  if (themeMode === 'light' || themeMode === 'dark') return themeMode;
+  return systemQuery && systemQuery.matches ? 'dark' : 'light';
+};
+
+const emitThemeChange = (theme) => {
+  for (const fn of themeListeners) { try { fn(theme); } catch {} }
+};
+
+const updateThemeControls = () => {
+  for (const { mode, el } of themeButtons) {
+    if (!el) continue;
+    const active = mode === themeMode;
+    el.dataset.active = active ? '1' : '0';
+    el.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+  if (themeStatus) {
+    themeStatus.textContent = themeMode === 'system' ? 'system -> ' + currentTheme : currentTheme;
+  }
+};
+
+const updateContextStatus = () => {
+  if (!sandboxContext) return;
+  sandboxContext.textContent = __SANDBOX__.pluginId + ':' + __SANDBOX__.appId;
+};
+
+const isInspectorOpen = () => sandboxInspector && sandboxInspector.style.display === 'flex';
+
+const formatJson = (value) => {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const tokenNameList = Array.isArray(__SANDBOX__.tokenNames) ? __SANDBOX__.tokenNames : [];
+
+const collectTokens = () => {
+  const style = getComputedStyle(document.documentElement);
+  const names = new Set(tokenNameList);
+  for (let i = 0; i < style.length; i += 1) {
+    const name = style[i];
+    if (name && name.startsWith('--ds-')) names.add(name);
+  }
+  return [...names]
+    .sort()
+    .map((name) => {
+      const value = style.getPropertyValue(name).trim();
+      return name + ': ' + (value || '(unset)');
+    })
+    .join('\\n');
+};
+
+const readHostContext = () => {
+  if (!inspectorEnabled) return null;
+  if (typeof host?.context?.get === 'function') return host.context.get();
+  return { pluginId: __SANDBOX__.pluginId, appId: __SANDBOX__.appId, theme: currentTheme, bridge: { enabled: true } };
+};
+
+const readThemeInfo = () => ({
+  themeMode,
+  currentTheme,
+  dataTheme: document.documentElement.dataset.theme || '',
+  dataThemeMode: document.documentElement.dataset.themeMode || '',
+  prefersColorScheme: systemQuery ? (systemQuery.matches ? 'dark' : 'light') : 'unknown',
+});
+
+const updateInspector = () => {
+  if (!inspectorEnabled) return;
+  if (inspectorContext) inspectorContext.textContent = formatJson(readHostContext());
+  if (inspectorTheme) inspectorTheme.textContent = formatJson(readThemeInfo());
+  if (inspectorTokens) inspectorTokens.textContent = collectTokens();
+};
+
+const startInspectorTimer = () => {
+  if (inspectorTimer) return;
+  inspectorTimer = setInterval(updateInspector, 1000);
+};
+
+const stopInspectorTimer = () => {
+  if (!inspectorTimer) return;
+  clearInterval(inspectorTimer);
+  inspectorTimer = null;
+};
+
+const setInspectorOpen = (open) => {
+  if (!sandboxInspector) return;
+  sandboxInspector.style.display = open ? 'flex' : 'none';
+  sandboxInspector.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (open) {
+    updateInspector();
+    startInspectorTimer();
+  } else {
+    stopInspectorTimer();
+  }
+};
+
+const updateInspectorIfOpen = () => {
+  if (!inspectorEnabled) return;
+  if (isInspectorOpen()) updateInspector();
+};
+
+const applyThemeMode = (mode, { persist = true } = {}) => {
+  themeMode = normalizeThemeMode(mode);
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    } catch {
+      // ignore
+    }
+  }
+  const nextTheme = resolveTheme();
+  const prevTheme = currentTheme;
+  currentTheme = nextTheme;
+  document.documentElement.dataset.theme = nextTheme;
+  document.documentElement.dataset.themeMode = themeMode;
+  updateThemeControls();
+  updateInspectorIfOpen();
+  if (nextTheme !== prevTheme) emitThemeChange(nextTheme);
+};
+
+if (systemQuery && typeof systemQuery.addEventListener === 'function') {
+  systemQuery.addEventListener('change', () => {
+    if (themeMode === 'system') applyThemeMode('system', { persist: false });
+  });
+}
+
+if (btnThemeLight) btnThemeLight.addEventListener('click', () => applyThemeMode('light'));
+if (btnThemeDark) btnThemeDark.addEventListener('click', () => applyThemeMode('dark'));
+if (btnThemeSystem) btnThemeSystem.addEventListener('click', () => applyThemeMode('system'));
+if (btnInspectorToggle) btnInspectorToggle.addEventListener('click', () => setInspectorOpen(!isInspectorOpen()));
+if (btnInspectorClose) btnInspectorClose.addEventListener('click', () => setInspectorOpen(false));
+if (btnInspectorRefresh) btnInspectorRefresh.addEventListener('click', () => updateInspector());
+
+applyThemeMode(themeMode || 'system', { persist: false });
+updateContextStatus();
 
 const entries = [];
 const listeners = new Set();
@@ -359,7 +695,7 @@ function renderPrompts() {
   }
 }
 
-const getTheme = () => (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+const getTheme = () => currentTheme || resolveTheme();
 
 const host = {
   bridge: { enabled: true },
@@ -367,11 +703,9 @@ const host = {
   theme: {
     get: getTheme,
     onChange: (listener) => {
-      if (!window.matchMedia || typeof listener !== 'function') return () => {};
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const fn = () => { try { listener(getTheme()); } catch {} };
-      mq.addEventListener('change', fn);
-      return () => mq.removeEventListener('change', fn);
+      if (typeof listener !== 'function') return () => {};
+      themeListeners.add(listener);
+      return () => themeListeners.delete(listener);
     },
   },
   admin: {
@@ -615,6 +949,9 @@ const host = {
   })(),
 };
 
+inspectorEnabled = true;
+updateInspector();
+
 let dispose = null;
 
 async function loadAndMount() {
@@ -786,11 +1123,13 @@ export async function startSandboxServer({ pluginDir, port = 4399, appId = '' })
       }
 
       if (req.method === 'GET' && pathname === '/sandbox.mjs') {
+        const tokenNames = loadTokenNames();
         const js = sandboxClientJs()
           .replaceAll('__SANDBOX__.pluginId', JSON.stringify(ctxBase.pluginId))
           .replaceAll('__SANDBOX__.appId', JSON.stringify(effectiveAppId))
           .replaceAll('__SANDBOX__.entryUrl', JSON.stringify(entryUrl))
-          .replaceAll('__SANDBOX__.registryApp', JSON.stringify({ plugin: { id: ctxBase.pluginId }, id: effectiveAppId, entry: { type: 'module', url: entryUrl } }));
+          .replaceAll('__SANDBOX__.registryApp', JSON.stringify({ plugin: { id: ctxBase.pluginId }, id: effectiveAppId, entry: { type: 'module', url: entryUrl } }))
+          .replaceAll('__SANDBOX__.tokenNames', JSON.stringify(tokenNames));
         return sendText(res, 200, js, 'text/javascript; charset=utf-8');
       }
 

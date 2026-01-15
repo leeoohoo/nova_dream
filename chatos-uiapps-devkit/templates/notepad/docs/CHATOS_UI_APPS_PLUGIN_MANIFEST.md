@@ -61,10 +61,21 @@
 { "type": "module", "path": "my-app/index.mjs" }
 ```
 
+可选：为“侧边抽屉/分栏/非全屏”等 **compact surface** 提供专门入口：
+
+```json
+{
+  "type": "module",
+  "path": "my-app/index.mjs",
+  "compact": { "type": "module", "path": "my-app/compact.mjs" }
+}
+```
+
 硬约束：
 
 - `entry.type` 必须为 `"module"`（ChatOS 不支持 `iframe/url`）。
 - `entry.path` 必须在插件目录内（宿主做路径边界校验），且必须是文件。
+- `entry.compact` 为可选；若提供，`entry.compact.path` 同样必须在插件目录内且必须是文件。
 
 ## 4. `apps[i].ai` schema（`uiAppAiSchema`）
 

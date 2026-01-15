@@ -6,6 +6,7 @@
 
 - `plugin/plugin.json`：插件清单（应用列表、入口、后端、AI 贡献）
 - `plugin/apps/__APP_ID__/index.mjs`：**module 入口**（导出 `mount({ container, host, slots })`）
+- `plugin/apps/__APP_ID__/compact.mjs`：**compact 入口**（可选；用于侧边抽屉/分栏场景）
 - `plugin/backend/index.mjs`：**插件后端**（导出 `createUiAppsBackend(ctx)`，通过 `host.backend.invoke()` 调用）
 - `plugin/apps/__APP_ID__/mcp-server.mjs`：应用自带 MCP Server（可选）
 - `plugin/apps/__APP_ID__/mcp-prompt.zh.md` / `.en.md`：MCP Prompt（可选）
@@ -21,6 +22,24 @@ npm run dev
 
 - 用 HTTP 运行你的 `module` 入口（模拟 ChatOS 的 `mount()` 调用）
 - 提供 `host.*` 的 mock（含 `host.backend.invoke()`、`host.uiPrompts.*`、`host.chat.*`）
+
+## 主题与样式（重要）
+
+- 宿主通过 `document.documentElement.dataset.theme` 下发 `light` / `dark`，用 `host.theme.get()` / `host.theme.onChange()` 读取与监听。
+- 推荐使用 CSS Tokens（`--ds-*`）做主题适配，避免硬编码颜色。
+- 本地沙箱右上角提供 Theme 切换（light/dark/system）用于测试样式响应。
+- 本地沙箱 Inspect 面板可查看 `host.context` 与 `--ds-*` tokens。
+
+## 开发清单（建议）
+
+- `plugin/plugin.json`：`apps[i].entry.type` 必须是 `module`，且 `path` 在插件目录内。
+- `plugin/plugin.json`：可选 `apps[i].entry.compact.path`，用于 compact UI。
+- `mount()`：返回卸载函数并清理事件/订阅；滚动放在应用内部，固定内容用 `slots.header`。
+- 主题：用 `host.theme.*` 与 `--ds-*` tokens；避免硬编码颜色。
+- 宿主能力：先判断 `host.bridge.enabled`，非宿主环境要可降级运行。
+- Node 能力：前端不直接用 Node API，需要时走 `host.backend.invoke()`。
+- 打包：依赖需 bundle 成单文件；不要指望 `node_modules` 随包生效。
+- 提交前：`npm run validate`，必要时再 `pack/install`。
 
 ## 复用 ChatOS 的 AI 调用（推荐）
 
@@ -46,7 +65,7 @@ npm run pack
 
 ## 协议文档
 
-`docs/` 目录包含当前版本的协议快照（建议团队内统一对齐）。
+`docs/` 目录包含当前版本的协议快照（建议团队内统一对齐），并包含主题样式指南与排错清单。
 
 ## 启用 MCP（可选）
 

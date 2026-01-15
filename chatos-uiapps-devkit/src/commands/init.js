@@ -120,6 +120,7 @@ export async function cmdInit({ positionals, flags }) {
   }
   maybeReplaceTokensInFile(path.join(pluginDir, 'backend', 'index.mjs'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'index.mjs'), replacements);
+  maybeReplaceTokensInFile(path.join(dstAppDir, 'compact.mjs'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'mcp-server.mjs'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'mcp-prompt.zh.md'), replacements);
   maybeReplaceTokensInFile(path.join(dstAppDir, 'mcp-prompt.en.md'), replacements);
