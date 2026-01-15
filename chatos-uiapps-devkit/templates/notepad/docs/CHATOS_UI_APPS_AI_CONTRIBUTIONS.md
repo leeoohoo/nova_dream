@@ -83,6 +83,8 @@
 - `pluginDir` / `dataDir`
 - `stateDir` / `sessionRoot` / `projectRoot`
 
+同时，宿主默认注入 `_meta.workdir`（默认等于 `dataDir`；如需指定其它目录，可在 `ai.mcp.callMeta.workdir` 覆盖）。
+
 示例（`plugin.json`）：
 
 ```json

@@ -797,12 +797,19 @@ class UiAppsManager {
         sessionRoot: this.sessionRoot,
         projectRoot: this.projectRoot,
       };
-      const uiAppContext = compactContext(context);
-      const baseMeta = Object.keys(uiAppContext).length > 0 ? { chatos: { uiApp: uiAppContext } } : null;
-      const rawCallMeta = ai?.mcp?.callMeta && typeof ai.mcp.callMeta === 'object' ? ai.mcp.callMeta : null;
-      const resolvedCallMeta = rawCallMeta ? resolveCallMetaValue(rawCallMeta, context) : null;
-      return mergeCallMeta(baseMeta, resolvedCallMeta);
-    };
+    const uiAppContext = compactContext(context);
+    const baseMeta = {};
+    if (Object.keys(uiAppContext).length > 0) {
+      baseMeta.chatos = { uiApp: uiAppContext };
+    }
+    if (dataDir) {
+      baseMeta.workdir = dataDir;
+    }
+    const baseMetaValue = Object.keys(baseMeta).length > 0 ? baseMeta : null;
+    const rawCallMeta = ai?.mcp?.callMeta && typeof ai.mcp.callMeta === 'object' ? ai.mcp.callMeta : null;
+    const resolvedCallMeta = rawCallMeta ? resolveCallMetaValue(rawCallMeta, context) : null;
+    return mergeCallMeta(baseMetaValue, resolvedCallMeta);
+  };
     const callMeta = ai?.mcp ? buildUiAppCallMeta() : null;
 
     const hasExposeMcpServers = exposeMcpServers === true || Array.isArray(exposeMcpServers);

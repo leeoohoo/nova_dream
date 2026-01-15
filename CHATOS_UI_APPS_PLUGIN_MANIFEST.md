@@ -162,7 +162,7 @@
 - `args` 会追加到命令行末尾
 - 宿主会把空格/引号等做安全引用，以避免路径包含空格时解析失败
 
-`callMeta` 会随每次 `tools/call` 请求发送给 MCP server（位于 `request.params._meta`），默认会合并宿主注入的 `_meta.chatos.uiApp`（含 `pluginId/appId/pluginDir/dataDir/stateDir/sessionRoot/projectRoot`）。
+`callMeta` 会随每次 `tools/call` 请求发送给 MCP server（位于 `request.params._meta`），默认会合并宿主注入的 `_meta.chatos.uiApp`（含 `pluginId/appId/pluginDir/dataDir/stateDir/sessionRoot/projectRoot`）与 `_meta.workdir`（默认等于 `dataDir`，可被 `callMeta.workdir` 覆盖）。
 
 ## 6. `ai.mcpPrompt`：应用默认 Prompt 声明
 
