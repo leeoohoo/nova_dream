@@ -14,7 +14,7 @@
 
 ## 术语与角色
 
-- **ChatOS（宿主）**：桌面端 Electron 应用（本仓库的 `deepseek_cli`）。
+- **ChatOS（宿主）**：桌面端 Electron 应用（本仓库的 `chatos`）。
 - **AIDE（引擎）**：模型调用/工具/MCP/子代理等核心能力（本仓库的 `aide`）。
 - **UI Apps（嵌入应用/小应用）**：以插件形式注入到桌面端「应用」中心的应用。
 - **MCP**：Model Context Protocol；通过 MCP Server 暴露 tools，最终工具名通常为 `mcp_<serverName>_<toolName>`。
@@ -25,8 +25,8 @@
 - `sessionRoot`：会话根目录
   - 默认：用户主目录（Home）
   - 可通过环境变量覆盖：`MODEL_CLI_SESSION_ROOT=/path/to/root`
-  - 桌面端/CLI 会把“上次使用的 sessionRoot”记录到 `<home>/.deepseek_cli/last-session-root.txt`（未设置 env 时会优先读取）
-- `stateDir`：`<home>/.deepseek_cli/<hostApp>`（ChatOS 的 `hostApp=chatos`）
+  - 桌面端/CLI 会把“上次使用的 sessionRoot”记录到 `<home>/.chatos/last-session-root.txt`（未设置 env 时会优先读取）
+- `stateDir`：`<home>/.chatos/<hostApp>`（ChatOS 的 `hostApp=chatos`）
 
 全局配置（由宿主维护；应用侧只读/复用）：
 
@@ -46,8 +46,8 @@
 
 宿主会扫描两个目录（并在 UI「应用」页展示实际路径）：
 
-- **内置/开发目录**：`deepseek_cli/ui_apps/plugins`
-- **用户插件目录**：`<stateDir>/ui_apps/plugins`（即 `~/.deepseek_cli/chatos/ui_apps/plugins`）
+- **内置/开发目录**：`chatos/ui_apps/plugins`
+- **用户插件目录**：`<stateDir>/ui_apps/plugins`（即 `~/.chatos/chatos/ui_apps/plugins`）
 
 同名 `plugin.id` 的覆盖规则：
 
@@ -69,7 +69,7 @@
 
 导入时的复制规则（重要）：
 
-- 会拷贝到用户插件目录 `~/.deepseek_cli/chatos/ui_apps/plugins/<sanitized(plugin.id)>/`；
+- 会拷贝到用户插件目录 `~/.chatos/chatos/ui_apps/plugins/<sanitized(plugin.id)>/`；
 - 默认会排除：`node_modules/`、`.git/`、`.DS_Store`、`*.map`；
 - 因此若插件需要依赖，请在构建时做 bundle（不要指望随包携带 `node_modules` 生效）。
 
@@ -89,7 +89,7 @@
 
 ## 最短接入路径（TL;DR）
 
-1) 从模板复制：`deepseek_cli/ui_apps/template/basic-plugin` → 放进任一插件目录  
+1) 从模板复制：`chatos/ui_apps/template/basic-plugin` → 放进任一插件目录  
 2) 修改 `plugin.json`：只支持 `apps[i].entry.type="module"`（可选增加 `entry.compact` 作为紧凑 UI 入口）  
 3) 桌面端打开「应用」页 → 点“刷新” → 进入你的应用  
 4) （可选）需要 Node 能力：加 `backend.entry`，前端用 `host.backend.invoke()`  
@@ -99,15 +99,15 @@
 
 ## 实现位置（便于对照代码）
 
-- schema（`plugin.json` / `apps[i].ai`）：`deepseek_cli/electron/ui-apps/schemas.js`
-- 插件扫描/入口校验/AI 同步：`deepseek_cli/electron/ui-apps/index.js`
-- 应用包导入（目录/zip）：`deepseek_cli/electron/ui-apps/plugin-installer.js`
-- module 运行时 Host API 注入：`deepseek_cli/apps/ui/src/features/apps/AppsPluginView.jsx`
+- schema（`plugin.json` / `apps[i].ai`）：`chatos/electron/ui-apps/schemas.js`
+- 插件扫描/入口校验/AI 同步：`chatos/electron/ui-apps/index.js`
+- 应用包导入（目录/zip）：`chatos/electron/ui-apps/plugin-installer.js`
+- module 运行时 Host API 注入：`chatos/apps/ui/src/features/apps/AppsPluginView.jsx`
 
 ## 原始文档来源（本次提取/整合）
 
-- `deepseek_cli/doc/app-dev-handbook.md`
-- `deepseek_cli/doc/app-integration.md`
-- `deepseek_cli/doc/ui-apps-plugins.md`
-- `deepseek_cli/doc/ui-apps-dev-guide.md`
+- `chatos/doc/app-dev-handbook.md`
+- `chatos/doc/app-integration.md`
+- `chatos/doc/ui-apps-plugins.md`
+- `chatos/doc/ui-apps-dev-guide.md`
 - `aide/shared/defaults/ui-apps-expose/README.md`

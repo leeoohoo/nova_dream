@@ -11,7 +11,7 @@
 
 本仓库的“应用间完全隔离”目标包含两点：
 
-1. **数据隔离**：每个应用只读写自己的 stateDir 与 admin DB（`~/.deepseek_cli/<app>/`）。
+1. **数据隔离**：每个应用只读写自己的 stateDir 与 admin DB（`~/.chatos/<app>/`）。
 2. **能力隔离**：默认**不做跨应用授权**；尤其是 **AIDE 永不调用其他应用的 MCP server**。
 
 ChatOS 作为注册中心，只负责：
@@ -95,7 +95,7 @@ await registry.hasMcpServerAccess(appId, serverId);
 - `mcpServerGrants`
 - `promptGrants`
 
-对应实现文件：`deepseek_cli/electron/backend/registry-center.js`
+对应实现文件：`chatos/electron/backend/registry-center.js`
 
 ---
 
@@ -118,11 +118,11 @@ await registry.hasMcpServerAccess(appId, serverId);
 
 ## 代码落点（本仓库）
 
-- 注册中心实现：`deepseek_cli/electron/backend/registry-center.js`
-- 跨 DB 同步：`deepseek_cli/electron/backend/registry-sync.js`
-- 启动时 bootstrap：`deepseek_cli/electron/main.js`
-- UI Apps 扫描时注册：`deepseek_cli/electron/ui-apps/index.js`
-- manifest 扩展字段：`deepseek_cli/electron/ui-apps/schemas.js`（新增 `providerAppId`）
+- 注册中心实现：`chatos/electron/backend/registry-center.js`
+- 跨 DB 同步：`chatos/electron/backend/registry-sync.js`
+- 启动时 bootstrap：`chatos/electron/main.js`
+- UI Apps 扫描时注册：`chatos/electron/ui-apps/index.js`
+- manifest 扩展字段：`chatos/electron/ui-apps/schemas.js`（新增 `providerAppId`）
 - git/wsl 插件声明归属：`git_app/plugin.json`、`wsl/plugin.json`（以及内置副本）
 
 ---
@@ -131,11 +131,11 @@ await registry.hasMcpServerAccess(appId, serverId);
 
 为保证打包后仍可注册：
 
-1. 需要在打包前把 AIDE runtime embed 到 `deepseek_cli/aide/`（见 `npm run aide:embed`）。
-2. 需要把 git/wsl UI plugin embed 到 `deepseek_cli/ui_apps/plugins/`（见 `npm run git:embed` / `npm run wsl:embed`）。
+1. 需要在打包前把 AIDE runtime embed 到 `chatos/aide/`（见 `npm run aide:embed`）。
+2. 需要把 git/wsl UI plugin embed 到 `chatos/ui_apps/plugins/`（见 `npm run git:embed` / `npm run wsl:embed`）。
 3. 打包后（asar）：
    - built-in plugins 在 asar 内可读（扫描/读取 prompt 文件 OK）
-   - registry 数据始终写入用户目录的 `~/.deepseek_cli/chatos/`（不写 asar）
+   - registry 数据始终写入用户目录的 `~/.chatos/chatos/`（不写 asar）
 
 ---
 

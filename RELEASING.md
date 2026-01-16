@@ -12,7 +12,7 @@ This repo is an npm workspaces monorepo. Packages are released independently.
 Use package-scoped tags:
 
 - `aide-vX.Y.Z` → `aide/` (`@leeoohoo/aide`)
-- `chatos-vX.Y.Z` → `deepseek_cli/` (`@leeoohoo/chatos`)
+- `chatos-vX.Y.Z` → `chatos/` (`@leeoohoo/chatos`)
 - `common-vX.Y.Z` → `common/` (`@leeoohoo/common`)
 - `ui-apps-devkit-vX.Y.Z` → `chatos-uiapps-devkit/` (`@leeoohoo/ui-apps-devkit`)
 

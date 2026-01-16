@@ -4,9 +4,9 @@
 
 实现对照（以代码为准）：
 
-- schema：`deepseek_cli/electron/ui-apps/schemas.js`
-- 扫描/校验：`deepseek_cli/electron/ui-apps/index.js`
-- 导入/安装：`deepseek_cli/electron/ui-apps/plugin-installer.js`
+- schema：`chatos/electron/ui-apps/schemas.js`
+- 扫描/校验：`chatos/electron/ui-apps/index.js`
+- 导入/安装：`chatos/electron/ui-apps/plugin-installer.js`
 
 另见：
 
@@ -18,8 +18,8 @@
 
 - 每个插件一个目录，目录根部必须包含 `plugin.json`。
 - 插件目录可放在：
-  - `deepseek_cli/ui_apps/plugins`（内置/开发）
-  - `~/.deepseek_cli/chatos/ui_apps/plugins`（用户插件目录）
+  - `chatos/ui_apps/plugins`（内置/开发）
+  - `~/.chatos/chatos/ui_apps/plugins`（用户插件目录）
 - 也可通过桌面端 UI：`应用` → `导入应用包`（目录或 `.zip`）安装到用户插件目录。
 
 ## 2. 顶层 schema（`uiAppsPluginSchema`）

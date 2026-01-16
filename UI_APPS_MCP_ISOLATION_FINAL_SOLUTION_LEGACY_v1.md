@@ -207,7 +207,7 @@ WHERE msg.app_id = 'aide'
 
 #### 1.1 创建迁移脚本
 
-**文件**：`deepseek_cli/electron/backend/migrations/001_add_registry_tables.js`
+**文件**：`chatos/electron/backend/migrations/001_add_registry_tables.js`
 
 **代码**：
 
@@ -296,7 +296,7 @@ export function down(db) {
 
 #### 2.1 创建注册中心模块
 
-**文件**：`deepseek_cli/electron/backend/registry-center.js`
+**文件**：`chatos/electron/backend/registry-center.js`
 
 **完整代码**：
 
@@ -727,7 +727,7 @@ export default getRegistryCenter();
 
 #### 3.1 修改 ui-apps/index.js
 
-**文件**：`deepseek_cli/electron/ui-apps/index.js`
+**文件**：`chatos/electron/ui-apps/index.js`
 
 **修改位置**：第 797-1016 行的 `#syncAiContributes()` 方法
 
@@ -1004,7 +1004,7 @@ import { getRegistryCenter } from '../backend/registry-center.js';
 
 #### 4.1 修改 src/cli.js
 
-**文件**：`deepseek_cli/src/cli.js`
+**文件**：`chatos/src/cli.js`
 
 **修改内容**：添加从注册中心查询授权 MCP servers 的逻辑
 
@@ -1145,7 +1145,7 @@ export class McpService extends BaseService {
 
     try {
       // 尝试从注册中心加载授权列表
-      const registryModule = await import('../../../../../deepseek_cli/electron/backend/registry-center.js').catch(() => null);
+      const registryModule = await import('../../../../../chatos/electron/backend/registry-center.js').catch(() => null);
       if (!registryModule || !registryModule.getRegistryCenter) {
         return null;
       }
@@ -1546,10 +1546,10 @@ node scripts/test-registry-isolation.js
 
 ```bash
 # 备份当前数据库
-cp ~/.config/deepseek_cli/chatos.db.sqlite ~/.config/deepseek_cli/chatos.db.sqlite.backup
+cp ~/.config/chatos/chatos.db.sqlite ~/.config/chatos/chatos.db.sqlite.backup
 
 # 删除注册中心表（保留原有数据）
-sqlite3 ~/.config/deepseek_cli/chatos.db.sqlite <<EOF
+sqlite3 ~/.config/chatos/chatos.db.sqlite <<EOF
 DROP INDEX IF EXISTS idx_appRegistrations_app_id;
 DROP INDEX IF EXISTS idx_promptGrants_prompt_id;
 DROP INDEX IF EXISTS idx_promptGrants_app_id;
@@ -1565,10 +1565,10 @@ EOF
 
 ```bash
 # 删除注册中心模块
-rm deepseek_cli/electron/backend/registry-center.js
+rm chatos/electron/backend/registry-center.js
 
 # 删除迁移脚本
-rm deepseek_cli/electron/backend/migrations/001_add_registry_tables.js
+rm chatos/electron/backend/migrations/001_add_registry_tables.js
 
 # 删除清理脚本
 rm scripts/cleanup-legacy-mcp-isolation.js
@@ -1581,10 +1581,10 @@ rm scripts/test-registry-isolation.js
 
 ```bash
 # 恢复 ui-apps/index.js
-git checkout deepseek_cli/electron/ui-apps/index.js
+git checkout chatos/electron/ui-apps/index.js
 
 # 恢复 src/cli.js
-git checkout deepseek_cli/src/cli.js
+git checkout chatos/src/cli.js
 
 # 恢复 mcp-service.js
 git checkout aide/shared/data/services/mcp-service.js
@@ -1593,7 +1593,7 @@ git checkout aide/shared/data/services/mcp-service.js
 5. **清理标记文件**
 
 ```bash
-rm ~/.config/deepseek_cli/.cleanup-legacy-mcp-isolation-done
+rm ~/.config/chatos/.cleanup-legacy-mcp-isolation-done
 ```
 
 6. **重启应用**
@@ -1624,8 +1624,8 @@ WHERE type='table'
 
 | 文件路径 | 描述 |
 |---------|------|
-| `deepseek_cli/electron/backend/registry-center.js` | 注册中心实现 |
-| `deepseek_cli/electron/backend/migrations/001_add_registry_tables.js` | 数据库迁移脚本 |
+| `chatos/electron/backend/registry-center.js` | 注册中心实现 |
+| `chatos/electron/backend/migrations/001_add_registry_tables.js` | 数据库迁移脚本 |
 | `scripts/cleanup-legacy-mcp-isolation.js` | 清理旧数据的脚本 |
 | `scripts/test-registry-isolation.js` | 端到端测试脚本 |
 | `UI_APPS_MCP_ISOLATION_FINAL_SOLUTION.md` | 本文档 |
@@ -1634,8 +1634,8 @@ WHERE type='table'
 
 | 文件路径 | 修改内容 |
 |---------|---------|
-| `deepseek_cli/electron/ui-apps/index.js` | 在 `#syncAiContributes()` 中添加注册中心调用 |
-| `deepseek_cli/src/cli.js` | 设置 `MODEL_CLI_HOST_APP='aide'` 并添加注册中心查询 |
+| `chatos/electron/ui-apps/index.js` | 在 `#syncAiContributes()` 中添加注册中心调用 |
+| `chatos/src/cli.js` | 设置 `MODEL_CLI_HOST_APP='aide'` 并添加注册中心查询 |
 | `aide/shared/data/services/mcp-service.js` | 增强权限过滤逻辑（可选） |
 
 ### B. API 文档
@@ -1692,7 +1692,7 @@ const apps = await registry.listApps();
 
 ```sql
 -- 手动执行迁移
-sqlite3 ~/.config/deepseek_cli/chatos.db.sqlite <<EOF
+sqlite3 ~/.config/chatos/chatos.db.sqlite <<EOF
 CREATE TABLE IF NOT EXISTS appRegistrations (...);
 CREATE TABLE IF NOT EXISTS mcpServerGrants (...);
 CREATE TABLE IF NOT EXISTS promptGrants (...);
@@ -1729,7 +1729,7 @@ DELETE FROM mcpServerGrants WHERE app_id = 'aide';
 **原因**：文件路径错误
 
 **解决**：
-检查导入路径是否正确，确保 `registry-center.js` 在 `deepseek_cli/electron/backend/` 目录下。
+检查导入路径是否正确，确保 `registry-center.js` 在 `chatos/electron/backend/` 目录下。
 
 ---
 

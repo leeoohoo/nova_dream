@@ -9,8 +9,8 @@
 
 实现对照（以代码为准）：
 
-- schema：`deepseek_cli/electron/ui-apps/schemas.js`
-- 扫描与贡献解析：`deepseek_cli/electron/ui-apps/index.js`（`#resolveAi` / `getAiContribution()`；可选 `#syncAiContributes` 持久化到 Admin DB）
+- schema：`chatos/electron/ui-apps/schemas.js`
+- 扫描与贡献解析：`chatos/electron/ui-apps/index.js`（`#resolveAi` / `getAiContribution()`；可选 `#syncAiContributes` 持久化到 Admin DB）
 - 内置默认清单：`aide/shared/defaults/ui-apps-expose/`
 
 ## 1. 两种暴露方式（应用侧选择其一或组合）
@@ -145,7 +145,7 @@ const workdir = extra?._meta?.workdir || extra?._meta?.chatos?.uiApp?.dataDir;
 
 内置应用采用两层设计：
 
-1) 宿主侧（`deepseek_cli` 的 `plugin.json`）只保留粗粒度开关：
+1) 宿主侧（`chatos` 的 `plugin.json`）只保留粗粒度开关：
 
 ```json
 { "ai": { "mcpServers": true, "prompts": true } }

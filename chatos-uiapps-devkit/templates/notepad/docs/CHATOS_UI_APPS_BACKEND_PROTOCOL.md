@@ -4,7 +4,7 @@
 
 实现对照（以代码为准）：
 
-- `deepseek_cli/electron/ui-apps/index.js`（`uiApps:invoke` 与后端加载/缓存）
+- `chatos/electron/ui-apps/index.js`（`uiApps:invoke` 与后端加载/缓存）
 
 ## 1. 开启后端：`plugin.json`
 
@@ -55,7 +55,7 @@ export async function createUiAppsBackend(ctx) {
 - `pluginId`：插件 ID
 - `pluginDir`：插件安装目录（只读引用；用于读取插件资源）
 - `dataDir`：`<stateDir>/ui_apps/data/<pluginId>`（插件可写数据目录；宿主会确保存在）
-- `stateDir`：`<home>/.deepseek_cli/<hostApp>`（ChatOS 的 `hostApp=chatos`）
+- `stateDir`：`<home>/.chatos/<hostApp>`（ChatOS 的 `hostApp=chatos`）
 - `sessionRoot`：会话根
 - `projectRoot`：宿主工程根（开发态下有用）
 - `llm`：可选（共享模型调用接口）

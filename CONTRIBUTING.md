@@ -4,9 +4,9 @@ Thanks for taking the time to contribute!
 
 This repo is an npm workspaces monorepo:
 
-- `deepseek_cli/`: ChatOS host (Electron desktop)
-- `aide/`: AIDE engine (tools/MCP/subagents)
-- `common/`: shared runtime utilities/components
+- `chatos/`: ChatOS host (Electron desktop)
+- `chatos/aide/`: AIDE engine (tools/MCP/subagents)
+- `chatos/common/`: shared runtime utilities/components
 - `chatos-uiapps-devkit/`: UI Apps DevKit (CLI + templates)
 
 ## Prerequisites
@@ -26,14 +26,14 @@ npm test
 Run a workspace script:
 
 ```bash
-npm -w aide test
-npm -w deepseek_cli start
+npm -w chatos/aide test
+npm -w chatos start
 ```
 
 Build ChatOS UI (if needed):
 
 ```bash
-npm -w deepseek_cli build
+npm -w chatos build
 ```
 
 ## Pull requests

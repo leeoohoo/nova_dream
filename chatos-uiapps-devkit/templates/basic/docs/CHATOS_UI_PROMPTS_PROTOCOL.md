@@ -11,9 +11,9 @@ UI Prompts 是 ChatOS 的全局交互队列：任意组件（AI / MCP / UI Apps�
 
 实现对照（以代码为准）：
 
-- UI 渲染：`deepseek_cli/apps/ui/src/features/session/floating-island/FloatingIslandPrompt.jsx`
-- 笑脸面板：`deepseek_cli/apps/ui/src/components/UiPromptsSmileHub.jsx`
-- Host IPC：`deepseek_cli/electron/main.js`（`uiPrompts:*`）
+- UI 渲染：`chatos/apps/ui/src/features/session/floating-island/FloatingIslandPrompt.jsx`
+- 笑脸面板：`chatos/apps/ui/src/components/UiPromptsSmileHub.jsx`
+- Host IPC：`chatos/electron/main.js`（`uiPrompts:*`）
 - 写入/读取日志：`aide/electron/session-api.js`（`requestUiPrompt` / `respondUiPrompt` / `readUiPromptsPayload`）
 - MCP `ui_prompter`：`aide/mcp_servers/ui-prompt-server.js`
 

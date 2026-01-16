@@ -4,7 +4,7 @@
 
 实现对照（以代码为准）：
 
-- `deepseek_cli/apps/ui/src/features/apps/AppsPluginView.jsx`
+- `chatos/apps/ui/src/features/apps/AppsPluginView.jsx`
 
 ## 1. module 入口规范
 
